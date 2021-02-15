@@ -89,4 +89,16 @@
 // ------- Reserved Words: end -------
 
 
+// ------- Parser Codes: Start -------
+
+#define T_EMPTY_STRING 301
+
+#define T_ARITH_OP 311
+#define T_ARITH_OP_PRIME 312
+#define T_TERM 313
+#define T_TERM_PRIME 314
+#define T_FACTOR 315
+
+#define T_EXPRESSION 320
+
 #endif //COMPILER_5183_TOKENCODES_H

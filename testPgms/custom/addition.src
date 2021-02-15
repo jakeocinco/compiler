@@ -1,7 +1,6 @@
 // TODO
     //      Assignment
-5+x*2-9+5-1021
-TEST
-getInt
-"HelLLO"
-:=
+
+// variable a : integer;
+a := 4+4;
+"hell"

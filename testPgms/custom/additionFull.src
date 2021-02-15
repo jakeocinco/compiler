@@ -1,13 +1,10 @@
 program test_program is
     variable a : integer;
-    variable x : integer;
-    variable y : integer;
+//    variable x : float;
 begin
-    // x := 1;
-    // y := 2;
     // TODO
     //      Assignment
     //      Block Comments
     //      Procedures
-    a := 5+x*y-9+5-1021;
+    a := 5*9+1;
 end program .
