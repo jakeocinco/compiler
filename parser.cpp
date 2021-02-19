@@ -95,7 +95,9 @@ void parser::parse_program(node *n) {
 }
 void parser::parse_program_declaration_block(node *n) {
     while (current.type != T_BEGIN && current.type != T_END_OF_FILE){
-        if (current.type == T_VARIABLE){
+        if (current.type == T_BLOCK_COMMENT_OPEN){
+            parse_block_comments();
+        } else if (current.type == T_VARIABLE){
             node* nn = new node(69);
             parse_variable_declaration(nn);
             n->newChild(nn);
@@ -104,8 +106,11 @@ void parser::parse_program_declaration_block(node *n) {
 }
 void parser::parse_program_statement_block(node *n){
     while (current.type != T_END && current.type != T_END_OF_FILE){
-        // This is not gonna work lol
-        if (current.type == T_IDENTIFIER){
+
+        if (current.type == T_BLOCK_COMMENT_OPEN){
+            parse_block_comments();
+        } else if (current.type == T_IDENTIFIER){
+            // This is not gonna work lol
             node* nn = new node(69);
             parse_variable_assignment(nn);
             n->newChild(nn);
@@ -317,6 +322,22 @@ void parser::parse_variable_assignment(node *n) {
     }
 }
 
+void parser::parse_block_comments() {
+    if (current.type == T_BLOCK_COMMENT_OPEN){
+        while( current.type != T_BLOCK_COMMENT_CLOSE) {
+            consume_token();
+            if (current.type == T_BLOCK_COMMENT_OPEN){
+                parse_block_comments();
+            }
+            if (current.type == T_END_OF_FILE){
+                cout << "NO CLOSURE" << endl;
+                break;
+            }
+        }
+        consume_token();
+    }
+}
+
 void parser::printer_tokens(std::list<scanner::_token> tokens) {
     for (auto tt : tokens){
         cout << tt.type << " | ";
@@ -378,12 +399,13 @@ void parser::print_node_leaves(node *n) {
 
 
 }
-
 void parser::consume_token() {
     current = next;
     if (next.type != T_END_OF_FILE)
         next = scan->get_next_token();
 }
+
+
 
 
 

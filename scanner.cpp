@@ -112,7 +112,8 @@ std::map<string, int> scanner::get_reserved_words() {
     r.insert_or_assign("=",T_ASSIGN);
     r.insert_or_assign("eof", T_END_OF_FILE);
     r.insert_or_assign(":=",T_COLON_EQUALS);
-
+    r.insert_or_assign("/*", T_BLOCK_COMMENT_OPEN);
+    r.insert_or_assign("*/", T_BLOCK_COMMENT_CLOSE);
     // BUILT IN FUNCTIONS
     r.insert_or_assign("getbool",T_GET_BOOL);
     r.insert_or_assign("getinteger",T_GET_INTEGER);

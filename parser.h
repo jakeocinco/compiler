@@ -35,6 +35,8 @@ private:
     void parse_variable_declaration(node* n);
     void parse_variable_assignment(node* n);
 
+    void parse_block_comments();
+
     /** VISUALIZERS **/
     void printer_tokens(std::list<scanner::_token> tokens);
     void print_nodes(node* n, unsigned depth = 0);

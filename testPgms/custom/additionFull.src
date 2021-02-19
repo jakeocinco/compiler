@@ -2,9 +2,12 @@ program test_program is
     variable a : integer;
 //    variable x : float;
 begin
-    // TODO
+    /* TODO
+    /*
     //      Assignment
     //      Block Comments
     //      Procedures
+    */
+    */
     a := 5*9+1;
 end program .
