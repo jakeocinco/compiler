@@ -21,11 +21,11 @@ parser::parser(string file_text) {
 //    print_node_leaves(head);
 //    head = new node(0);
     parse_program(head);
-    while (next.type != T_END_OF_FILE && false){}
+
     print_node_leaves(head);
 }
 
-
+/** Program **/
 void parser::parse_program(node *n) {
     node* program_identifier = NULL;
     node* program_name = NULL;
@@ -118,6 +118,7 @@ void parser::parse_program_statement_block(node *n){
     }
 }
 
+/** Expressions **/
 void parser::parse_arith_op(node* n) {
     node* term = new node(1);
     node* expr_prime = new node(2);
@@ -135,7 +136,9 @@ void parser::parse_term(node* n) {
     parse_factor(factor);
     parse_term_prime(term_prime);
 
-    n->newChild(factor);
+    if (!factor->children.empty()){
+        n->newChild(factor);
+    }
     n->newChild(term_prime);
 }
 void parser::parse_arith_op_prime(node* n) {
@@ -169,7 +172,9 @@ void parser::parse_term_prime(node* n) {
         parse_term_prime(term_prime);
 
         n->newChild(symbol);
-        n->newChild(factor);
+        if (!factor->children.empty()){
+            n->newChild(factor);
+        }
         n->newChild(term_prime);
     } else {
         // EMPTY
@@ -179,14 +184,21 @@ void parser::parse_term_prime(node* n) {
 void parser::parse_factor(node* n) {
     if (current.type == T_INTEGER_LITERAL){
         n->newChild(node::create_integer_literal_node(current.val.intValue));
+        consume_token();
     } else if (current.type == T_FLOAT_LITERAL){
         n->newChild(node::create_double_literal_node(current.val.doubleValue));
-    } else{
+        consume_token();
+    } else if (current.type != T_SEMICOLON){
         n->newChild(node::create_identifier_literal_node(current.val.stringValue, current.type));
+        consume_token();
     }
-    consume_token();
+//    consume_token();
+//    if (current.type == T_SEMICOLON){
+//        consume_token();
+//    }
 }
 
+/** Variables **/
 void parser::parse_variable_declaration(node *n) {
     /** TODO: ADD TO TABLE **/
     node* variable_identifier = NULL;
@@ -268,7 +280,7 @@ void parser::parse_variable_assignment(node *n) {
     bool isArray = false;
 
     node* assignment_sign = NULL;
-    node* expression = NULL;
+    node* value = NULL;
 
     if (current.type == T_IDENTIFIER){
         /** TODO: Check scope **/
@@ -293,35 +305,55 @@ void parser::parse_variable_assignment(node *n) {
     }
 
     // Can stuff like this be stripped yet -- kinda like semi colons
-
     if (current.type == T_COLON_EQUALS){
         assignment_sign = new node(current.val.stringValue, T_COLON_EQUALS);
         consume_token();
     }
-    expression = new node("", T_EXPRESSION);
-    parse_arith_op(expression);
 
 
-    if ( variable != NULL && assignment_sign != NULL &&
-         !expression->children.empty()){
-        if ((l_bracket_identifier != NULL && array_size != NULL &&
-             r_bracket_identifier != NULL) || !isArray) {
-            n->newChild(variable);
-            if (isArray) {
-                n->newChild(l_bracket_identifier);
-                n->newChild(array_size);
-                n->newChild(r_bracket_identifier);
-            }
-            n->newChild(assignment_sign);
-            n->newChild(expression);
-        } else {
-            cout << "ERROR 1";
-        }
+    if (current.type == T_STRING_LITERAL){
+        value = node::create_string_literal_node(current.val.stringValue);
+        consume_token();
+    } else if (current.type == T_FALSE){
+        value = new node("false", T_FALSE);
+        consume_token();
+    } else if (current.type == T_TRUE){
+        value = new node("true", T_TRUE);
+        consume_token();
     } else {
-        cout << "ERROR 2, size: " << assignment_sign << variable << expression->children.size();
+        value = new node("", T_EXPRESSION);
+        parse_arith_op(value);
     }
+
+
+    if (current.type == T_SEMICOLON){
+        consume_token();
+        if ( variable != NULL && assignment_sign != NULL &&
+             value != NULL){
+            if ((l_bracket_identifier != NULL && array_size != NULL &&
+                 r_bracket_identifier != NULL) || !isArray) {
+                n->newChild(variable);
+                if (isArray) {
+                    n->newChild(l_bracket_identifier);
+                    n->newChild(array_size);
+                    n->newChild(r_bracket_identifier);
+                }
+                n->newChild(assignment_sign);
+                n->newChild(value);
+            } else {
+                cout << "ERROR 1";
+            }
+        } else {
+            cout << "ERROR 2, size: " << assignment_sign << variable << value->children.size();
+        }
+    } else{
+        cout << "No semicolon" << endl;
+    }
+
+
 }
 
+/** Block Comments **/
 void parser::parse_block_comments() {
     if (current.type == T_BLOCK_COMMENT_OPEN){
         while( current.type != T_BLOCK_COMMENT_CLOSE) {

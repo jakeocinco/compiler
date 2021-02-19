@@ -22,19 +22,25 @@ private:
 
     void consume_token();
 
+    /** Program Level **/
     void parse_program(node* n);
     void parse_program_declaration_block(node* n);
     void parse_program_statement_block(node* n);
 
+    /** Procedures **/
+
+    /** Expressions **/
     void parse_arith_op(node* n);
     void parse_term(node* n);
     void parse_arith_op_prime(node* n);
     void parse_term_prime(node* n);
     void parse_factor(node* n);
 
+    /** Variables **/
     void parse_variable_declaration(node* n);
     void parse_variable_assignment(node* n);
 
+    /** Block Comments **/
     void parse_block_comments();
 
     /** VISUALIZERS **/
