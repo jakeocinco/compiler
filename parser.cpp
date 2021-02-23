@@ -10,19 +10,18 @@
 #include <sstream>
 #include <fstream>
 parser::parser(string file_text) {
-//    list<scanner::_token> tokens = get_tokens(file_text);
-    head = new node(0);
+
+    head = new node(T_PROGRAM_ROOT);
+//    head = new node(T_ARITH_OP);
+
     scan = new scanner(file_text + ' ');
     std::list<scanner::_token> tokens;
     current = scan->get_next_token();
     next = scan->get_next_token();
-//    parse_arith_op(head);
-//    parse_variable_declaration(head);
-//    print_node_leaves(head);
-//    head = new node(0);
-    parse_program(head);
 
-    print_node_leaves(head);
+    parse_program(head);
+//    parse_arith_op(head);
+    print_node_to_json(head);
 }
 
 /** Program **/
@@ -118,53 +117,123 @@ void parser::parse_program_statement_block(node *n){
     }
 }
 
+/** Procedures **/
+void parser::parse_procedure(node *n) {
+    node* program_identifier = NULL;
+    node* program_name = NULL;
+    node* is_identifier = NULL;
+
+    if (current.type == T_PROCEDURE){
+        program_identifier = new node("procedure", T_PROGRAM);
+        consume_token();
+    }
+    if (current.type == T_IDENTIFIER){
+        program_name = new node(current.val.stringValue, T_IDENTIFIER);
+        consume_token();
+    }
+    if (current.type == T_IS){
+        is_identifier = new node("is", T_IS);
+        consume_token();
+    }
+
+    if (program_identifier != NULL && program_name != NULL && is_identifier != NULL){
+        n->newChild(program_identifier);
+        n->newChild(program_name);
+        n->newChild(is_identifier);
+
+
+    }
+
+    /** Process declaration block **/
+    node* declarations = new node(68);
+    parse_program_declaration_block(declarations);
+    n->newChild(declarations);
+
+    node* begin_identifier = NULL;
+    if (current.type == T_BEGIN){
+        begin_identifier = new node("begin", T_BEGIN);
+        consume_token();
+    }
+    if (begin_identifier != NULL){
+        n->newChild(begin_identifier);
+    }
+
+    /** Process statement block **/
+    node* statement = new node(70);
+    parse_program_statement_block(statement);
+    n->newChild(statement);
+
+    node* end_identifier = NULL;
+    node* end_program_identifier = NULL;
+    node* end_period_identifier = NULL;
+    if (current.type == T_END){
+        end_identifier = new node("end", T_END);
+        consume_token();
+    }
+    if (current.type == T_PROGRAM){
+        end_program_identifier = new node("program", T_PROGRAM);
+        consume_token();
+    }
+    if (current.type == T_PERIOD){
+        end_period_identifier = new node(".", T_PERIOD);
+        current = next;
+    }
+    if (end_identifier != NULL && end_program_identifier != NULL && end_period_identifier != NULL){
+        n->newChild(end_identifier);
+        n->newChild(end_program_identifier);
+        n->newChild(end_period_identifier);
+    }
+
+}
+
 /** Expressions **/
 void parser::parse_arith_op(node* n) {
-    node* term = new node(1);
-    node* expr_prime = new node(2);
+    node* term = new node(T_TERM);
+    node* arith_op_prime = new node(T_ARITH_OP_PRIME);
 
     parse_term(term);
-    parse_arith_op_prime(expr_prime);
+    parse_arith_op_prime(arith_op_prime);
 
-    n->newChild(term);
-    n->newChild(expr_prime);
+    if (!term->children.empty())
+        n->newChild(term);
+    if (!arith_op_prime->children.empty())
+        n->newChild(arith_op_prime);
 }
 void parser::parse_term(node* n) {
-    node* factor = new node(0);
-    node* term_prime = new node(2);
+    node* factor = new node(T_FACTOR);
+    node* term_prime = new node(T_TERM_PRIME);
 
     parse_factor(factor);
     parse_term_prime(term_prime);
 
-    if (!factor->children.empty()){
+    if (!factor->children.empty())
         n->newChild(factor);
-    }
-    n->newChild(term_prime);
+    if (!term_prime->children.empty())
+        n->newChild(term_prime);
 }
 void parser::parse_arith_op_prime(node* n) {
     if (current.type == T_ADD || current.type == T_MINUS){
         node* symbol = node::create_identifier_literal_node(current.val.stringValue, current.type);
-        node* term = new node(2);
-        node* expr_prime = new node(2);
+        node* term = new node(T_TERM);
+        node* arith_op_prime = new node(T_ARITH_OP_PRIME);
 
         consume_token();
 
         parse_term(term);
-        parse_arith_op(expr_prime);
+        parse_arith_op(arith_op_prime);
 
         n->newChild(symbol);
-        n->newChild(term);
-        n->newChild(expr_prime);
-    } else {
-        // EMPTY
-        n->newChild(new node(T_EMPTY_STRING));
+        if (!term->children.empty())
+            n->newChild(term);
+        if (!arith_op_prime->children.empty())
+            n->newChild(arith_op_prime);
     }
 }
 void parser::parse_term_prime(node* n) {
     if (current.type == T_MULTIPLY || current.type == T_DIVIDE){
         node* symbol = node::create_identifier_literal_node(current.val.stringValue, current.type);
-        node* factor = new node(2);
-        node* term_prime = new node(2);
+        node* factor = new node(T_FACTOR);
+        node* term_prime = new node(T_TERM_PRIME);
 
         consume_token();
 
@@ -172,13 +241,10 @@ void parser::parse_term_prime(node* n) {
         parse_term_prime(term_prime);
 
         n->newChild(symbol);
-        if (!factor->children.empty()){
+        if (!factor->children.empty())
             n->newChild(factor);
-        }
-        n->newChild(term_prime);
-    } else {
-        // EMPTY
-        n->newChild(new node(T_EMPTY_STRING));
+        if (!term_prime->children.empty())
+            n->newChild(term_prime);
     }
 }
 void parser::parse_factor(node* n) {
@@ -321,7 +387,7 @@ void parser::parse_variable_assignment(node *n) {
         value = new node("true", T_TRUE);
         consume_token();
     } else {
-        value = new node("", T_EXPRESSION);
+        value = new node("", T_ARITH_OP);
         parse_arith_op(value);
     }
 
@@ -431,6 +497,49 @@ void parser::print_node_leaves(node *n) {
 
 
 }
+void parser::print_node_to_json(node *n, std::ofstream* file_id) {
+    bool root = false;
+    if( file_id == nullptr){
+        root = true;
+        file_id = new std::ofstream ("file2.json");
+
+        *(file_id) << "{\n";
+    }
+
+
+    if (n->children.empty()){
+        *(file_id) << "\"" << n->type << "\":";
+        if (n->type == T_INTEGER_LITERAL){
+            *(file_id) << "\"" << n->val.intValue << "\"";
+        } else if (n->type == T_FLOAT_LITERAL){
+            *(file_id) << "\"" << n->val.doubleValue << "\"";
+        } else if (n->type == T_STRING_LITERAL){
+            *(file_id) << "" << n->val.stringValue << "";
+        }else if (n->type == T_EMPTY_STRING){
+        }else if (n->type < 300){
+            *(file_id) << "\"" << n->val.stringValue << "\"";
+        }
+    } else {
+        *(file_id) << "\"" << n->type << "\":";
+        *(file_id) << "{\n";
+
+        for (int c = 0; c < n->children.size(); c++){
+            print_node_to_json(n->children.at(c), file_id);
+            if (c != n->children.size() - 1)
+                *(file_id) << ",";
+            *(file_id) << "\n";
+        }
+
+        *(file_id) << "}\n";
+    }
+
+    if( root ){
+        *(file_id) << "}\n";
+        file_id->close();
+    }
+}
+
+
 void parser::consume_token() {
     current = next;
     if (next.type != T_END_OF_FILE)

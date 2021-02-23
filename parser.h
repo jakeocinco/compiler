@@ -28,6 +28,7 @@ private:
     void parse_program_statement_block(node* n);
 
     /** Procedures **/
+    void parse_procedure(node* n);
 
     /** Expressions **/
     void parse_arith_op(node* n);
@@ -47,6 +48,7 @@ private:
     void printer_tokens(std::list<scanner::_token> tokens);
     void print_nodes(node* n, unsigned depth = 0);
     void print_node_leaves(node* n);
+    void print_node_to_json(node* n, std::ofstream* file_id = nullptr);
     std::list<scanner::_token> get_tokens(std::string file_text);
 };
 

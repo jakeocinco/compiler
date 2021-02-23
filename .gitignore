@@ -57,3 +57,5 @@ test/test_runner
 .idea/
 Testing
 Compiler_5183
+
+*.json

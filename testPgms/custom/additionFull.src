@@ -10,5 +10,6 @@ begin
     */
     */
     a := 5*9+1;
-    b := "jake";
+    //a := 9;
+    b := "jake"; // hello
 end program .

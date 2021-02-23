@@ -7,6 +7,7 @@
 
 
 #include <list>
+#include <vector>
 
 class node {
 public:
@@ -20,7 +21,7 @@ public:
 
 
     int type;
-    std::list<node*> children;
+    std::vector<node*> children;
     union {
         char stringValue[256]; // holds lexeme value if string/identifier
         int intValue; // holds lexeme value if integer
