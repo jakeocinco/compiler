@@ -130,7 +130,7 @@ std::map<string, int> scanner::get_reserved_words() {
 }
 
 bool scanner::is_delimiter(string s) {
-    std::list<string> l = { "&","|","*","/","+","-","(",")","[","]",",",".",":",";","="};
+    std::list<string> l = { "&","|","*","/","+","-","(",")","[","]",",",".",":",";","=",">","<","!"};
     return (std::find(std::begin(l), std::end(l), s) != std::end(l));
 }
 
@@ -187,6 +187,21 @@ string scanner::get_next_text() {
                 }
             }
             if (symbol == ":"){
+                if (raw_text.at(cursor + 1) == '='){
+                    if (cursor == 0){
+                        s = trim(raw_text.substr(0,cursor+2), ws);
+                        raw_text = raw_text.substr(cursor+2, raw_text.length());
+                        cursor = 0;
+                        return s;
+                    } else {
+                        s = trim(raw_text.substr(0,cursor), ws);
+                        raw_text = raw_text.substr(cursor, raw_text.length());
+                        cursor = 0;
+                        return s;
+                    }
+                }
+            }
+            if (symbol == ">" || symbol == "<" || symbol == "!" || symbol == "="){
                 if (raw_text.at(cursor + 1) == '='){
                     if (cursor == 0){
                         s = trim(raw_text.substr(0,cursor+2), ws);

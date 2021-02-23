@@ -9,6 +9,7 @@
 #include <regex>
 #include <sstream>
 #include <fstream>
+
 parser::parser(string file_text) {
 
     scan = new scanner(file_text + ' ');
@@ -18,7 +19,8 @@ parser::parser(string file_text) {
     next = scan->get_next_token();
 
     head = new node(T_PROGRAM_ROOT);
-    parse_program(head);
+//    parse_program(head);
+    parse_logical_op(head);
     print_node_to_json(head);
 }
 
@@ -288,7 +290,7 @@ void parser::parse_procedure_return_statement(node *n){
         consume_token();
     }
 
-    get_value(value);
+    get_value_node(value);
 
     if (current.type == T_SEMICOLON && return_identifier != nullptr && value != nullptr){
         n->newChild(return_identifier);
@@ -298,6 +300,7 @@ void parser::parse_procedure_return_statement(node *n){
 }
 
 /** Expressions **/
+// Arithmetic
 void parser::parse_arith_op(node* n) {
     node* term = new node(T_TERM);
     node* arith_op_prime = new node(T_ARITH_OP_PRIME);
@@ -373,6 +376,28 @@ void parser::parse_factor(node* n) {
 //    if (current.type == T_SEMICOLON){
 //        consume_token();
 //    }
+}
+// Logic
+void parser::parse_logical_op(node *n) {
+    node* left_hand_value = nullptr;
+    node* operator_identifier = nullptr;
+    node* right_hand_value = nullptr;
+
+    get_boolean_node(left_hand_value);
+
+    if (is_current_relational_operator()){
+        operator_identifier = new node(current.val.stringValue, current.type);
+        consume_token();
+        get_boolean_node(right_hand_value);
+    }
+
+    if (left_hand_value != nullptr ){
+        if (operator_identifier != nullptr && right_hand_value != nullptr) {
+            n->newChild(left_hand_value);
+            n->newChild(operator_identifier);
+            n->newChild(right_hand_value);
+        }
+    }
 }
 
 /** Variables **/
@@ -487,7 +512,7 @@ void parser::parse_variable_assignment(node *n) {
         consume_token();
     }
 
-    get_value(value);
+    get_value_node(value);
 
     if (current.type == T_SEMICOLON){
         consume_token();
@@ -532,7 +557,7 @@ void parser::parse_block_comments() {
 }
 
 /** Helpers and Code Reuse **/
-void parser::get_value(node *&n) {
+void parser::get_value_node(node *&n) {
     if (current.type == T_STRING_LITERAL){
         n = node::create_string_literal_node(current.val.stringValue);
         consume_token();
@@ -547,19 +572,37 @@ void parser::get_value(node *&n) {
         parse_arith_op(n);
     }
 }
+void parser::get_boolean_node(node *&n){
+    if (current.type == T_FALSE){
+        n = new node("false", T_FALSE);
+        consume_token();
+    } else if (current.type == T_TRUE){
+        n = new node("true", T_TRUE);
+        consume_token();
+    } else {
+        n = new node("", T_ARITH_OP);
+        parse_arith_op(n);
+    }
+}
+
+bool parser::is_current_relational_operator() {
+    return current.type >= T_L_THAN && current.type <= T_N_EQUALS;
+}
 
 
 
-void parser::printer_tokens(std::list<scanner::_token> tokens) {
-    for (auto tt : tokens){
-        cout << tt.type << " | ";
-        if (tt.type == T_INTEGER_LITERAL)
-            cout << tt.val.intValue << " | " ;
-        else if (tt.type == T_FLOAT_LITERAL)
-            cout << tt.val.doubleValue << " | " ;
+void parser::printer_tokens() {
+    while(current.type != T_END_OF_FILE){
+        cout << current.type << " | ";
+        if (current.type == T_INTEGER_LITERAL)
+            cout << current.val.intValue << " | " ;
+        else if (current.type == T_FLOAT_LITERAL)
+            cout << current.val.doubleValue << " | " ;
         else
-            cout << tt.val.stringValue << " | ";
-        cout << tt.line_number << endl;
+            cout << current.val.stringValue << " | ";
+        cout << current.line_number << endl;
+
+        consume_token();
     }
 }
 std::list<scanner::_token> parser::get_tokens(std::string file_text) {
@@ -649,6 +692,10 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
         file_id->close();
     }
 }
+
+
+
+
 
 
 
