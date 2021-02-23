@@ -1,15 +1,14 @@
 program test_program is
     variable a : integer;
 //    variable x : float;
+    procedure getName : string()
+        variable name : string;
+        begin
+            return "Jake";
+        end procedure;
 begin
-    /* TODO
-    /*
-    //      Assignment
-    //      Block Comments
-    //      Procedures
-    */
-    */
-    a := 5*9+1;
+
+    a := 2+10/5*9;
     //a := 9;
     b := "jake"; // hello
 end program .

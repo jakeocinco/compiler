@@ -29,6 +29,9 @@ private:
 
     /** Procedures **/
     void parse_procedure(node* n);
+    void parse_procedure_declaration_block(node* n);
+    void parse_procedure_statement_block(node* n);
+    void parse_procedure_return_statement(node* n);
 
     /** Expressions **/
     void parse_arith_op(node* n);
@@ -43,6 +46,9 @@ private:
 
     /** Block Comments **/
     void parse_block_comments();
+
+    /** Helpers and Code Reuse **/
+    void get_value(node*& n);
 
     /** VISUALIZERS **/
     void printer_tokens(std::list<scanner::_token> tokens);

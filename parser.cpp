@@ -11,17 +11,21 @@
 #include <fstream>
 parser::parser(string file_text) {
 
-    head = new node(T_PROGRAM_ROOT);
-//    head = new node(T_ARITH_OP);
-
     scan = new scanner(file_text + ' ');
+
     std::list<scanner::_token> tokens;
     current = scan->get_next_token();
     next = scan->get_next_token();
 
+    head = new node(T_PROGRAM_ROOT);
     parse_program(head);
-//    parse_arith_op(head);
     print_node_to_json(head);
+}
+
+void parser::consume_token() {
+    current = next;
+    if (next.type != T_END_OF_FILE)
+        next = scan->get_next_token();
 }
 
 /** Program **/
@@ -52,7 +56,7 @@ void parser::parse_program(node *n) {
     }
 
     /** Process declaration block **/
-    node* declarations = new node(68);
+    node* declarations = new node(T_PROGRAM_DECLARATION_BLOCK);
     parse_program_declaration_block(declarations);
     n->newChild(declarations);
 
@@ -66,7 +70,7 @@ void parser::parse_program(node *n) {
     }
 
     /** Process statement block **/
-    node* statement = new node(70);
+    node* statement = new node(T_PROGRAM_STATEMENT_BLOCK);
     parse_program_statement_block(statement);
     n->newChild(statement);
 
@@ -97,8 +101,12 @@ void parser::parse_program_declaration_block(node *n) {
         if (current.type == T_BLOCK_COMMENT_OPEN){
             parse_block_comments();
         } else if (current.type == T_VARIABLE){
-            node* nn = new node(69);
+            node* nn = new node(T_VARIABLE_DECLARATION);
             parse_variable_declaration(nn);
+            n->newChild(nn);
+        } else if(current.type == T_PROCEDURE){
+            node* nn = new node(T_PROCEDURE_DECLARATION);
+            parse_procedure(nn);
             n->newChild(nn);
         }
     }
@@ -110,7 +118,7 @@ void parser::parse_program_statement_block(node *n){
             parse_block_comments();
         } else if (current.type == T_IDENTIFIER){
             // This is not gonna work lol
-            node* nn = new node(69);
+            node* nn = new node(T_VARIABLE_ASSIGNMENT);
             parse_variable_assignment(nn);
             n->newChild(nn);
         }
@@ -119,34 +127,91 @@ void parser::parse_program_statement_block(node *n){
 
 /** Procedures **/
 void parser::parse_procedure(node *n) {
-    node* program_identifier = NULL;
-    node* program_name = NULL;
-    node* is_identifier = NULL;
+    node* procedure_identifier = nullptr;
+    node* procedure_name = nullptr;
+    node* colon_identifier = nullptr;
+    node* return_type = nullptr;
 
     if (current.type == T_PROCEDURE){
-        program_identifier = new node("procedure", T_PROGRAM);
+        procedure_identifier = new node("procedure", T_PROCEDURE);
         consume_token();
     }
     if (current.type == T_IDENTIFIER){
-        program_name = new node(current.val.stringValue, T_IDENTIFIER);
+        procedure_name = new node(current.val.stringValue, T_IDENTIFIER);
         consume_token();
     }
-    if (current.type == T_IS){
-        is_identifier = new node("is", T_IS);
+    if (current.type == T_COLON){
+        colon_identifier = new node(":", T_COLON);
+        consume_token();
+    }
+    if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
+            current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
+        return_type = new node(current.val.stringValue, current.type);
         consume_token();
     }
 
-    if (program_identifier != NULL && program_name != NULL && is_identifier != NULL){
-        n->newChild(program_identifier);
-        n->newChild(program_name);
-        n->newChild(is_identifier);
-
+    if (procedure_identifier != nullptr && procedure_name != nullptr
+            && colon_identifier != nullptr && return_type != nullptr){
+        n->newChild(procedure_identifier);
+        n->newChild(procedure_name);
+        n->newChild(colon_identifier);
+        n->newChild(return_type);
 
     }
+    // Throw error on else
+
+    node* param_list = nullptr;
+    if (current.type == T_LPAREN){
+        param_list = new node("(", T_PARAMETER_LIST);
+        while(current.type != T_RPAREN){
+            consume_token();
+
+            node* variable_identifier = nullptr;
+            node* variable_name = nullptr;
+            node* variable_colon_identifier = nullptr;
+            node* variable_type_identifier = nullptr;
+
+            if (current.type == T_VARIABLE){
+                variable_identifier = new node("variable", T_PROCEDURE);
+                consume_token();
+            }
+            if (current.type == T_IDENTIFIER){
+                variable_name = new node(current.val.stringValue, T_IDENTIFIER);
+                consume_token();
+            }
+            if (current.type == T_COLON){
+                variable_colon_identifier = new node(":", T_COLON);
+                consume_token();
+            }
+            if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
+                    current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
+                variable_type_identifier = new node(current.val.stringValue, current.type);
+                consume_token();
+            }
+
+            if (variable_identifier != nullptr && variable_name != nullptr
+                    && variable_colon_identifier != nullptr && variable_type_identifier != nullptr){
+                node* param = new node(T_PARAMETER);
+
+                param->newChild(variable_identifier);
+                param->newChild(variable_name);
+                param->newChild(variable_colon_identifier);
+                param->newChild(variable_type_identifier);
+
+                param_list->newChild(param);
+            }
+
+        }
+        consume_token();
+    }
+
+    if (param_list != nullptr && !param_list->children.empty())
+        n->newChild(param_list);
+    // Throw error on else
 
     /** Process declaration block **/
-    node* declarations = new node(68);
-    parse_program_declaration_block(declarations);
+    node* declarations = new node(T_PROCEDURE_DECLARATION_BLOCK);
+    parse_procedure_declaration_block(declarations);
     n->newChild(declarations);
 
     node* begin_identifier = NULL;
@@ -159,31 +224,77 @@ void parser::parse_procedure(node *n) {
     }
 
     /** Process statement block **/
-    node* statement = new node(70);
-    parse_program_statement_block(statement);
+    node* statement = new node(T_PROCEDURE_STATEMENT_BLOCK);
+    parse_procedure_statement_block(statement);
     n->newChild(statement);
 
     node* end_identifier = NULL;
-    node* end_program_identifier = NULL;
-    node* end_period_identifier = NULL;
+    node* end_procedure_identifier = NULL;
     if (current.type == T_END){
         end_identifier = new node("end", T_END);
         consume_token();
     }
-    if (current.type == T_PROGRAM){
-        end_program_identifier = new node("program", T_PROGRAM);
+    if (current.type == T_PROCEDURE){
+        end_procedure_identifier = new node("procedure", T_PROCEDURE);
         consume_token();
     }
-    if (current.type == T_PERIOD){
-        end_period_identifier = new node(".", T_PERIOD);
-        current = next;
-    }
-    if (end_identifier != NULL && end_program_identifier != NULL && end_period_identifier != NULL){
+
+    if (current.type == T_SEMICOLON && end_identifier != nullptr && end_procedure_identifier != nullptr){
         n->newChild(end_identifier);
-        n->newChild(end_program_identifier);
-        n->newChild(end_period_identifier);
+        n->newChild(end_procedure_identifier);
+
+        consume_token();
     }
 
+}
+void parser::parse_procedure_declaration_block(node *n) {
+    while (current.type != T_BEGIN && current.type != T_END_OF_FILE){
+        if (current.type == T_BLOCK_COMMENT_OPEN){
+            parse_block_comments();
+        } else if (current.type == T_VARIABLE){
+            node* nn = new node(T_VARIABLE_DECLARATION);
+            parse_variable_declaration(nn);
+            n->newChild(nn);
+        } else if(current.type == T_PROCEDURE){
+            node* nn = new node(T_PROCEDURE_DECLARATION);
+            parse_procedure(nn);
+            n->newChild(nn);
+        }
+    }
+}
+void parser::parse_procedure_statement_block(node *n){
+    while (current.type != T_END && current.type != T_END_OF_FILE){
+        if (current.type == T_BLOCK_COMMENT_OPEN){
+            parse_block_comments();
+        } else if (current.type == T_IDENTIFIER){
+            // This is not gonna work lol
+            node* nn = new node(T_VARIABLE_ASSIGNMENT);
+            parse_variable_assignment(nn);
+            n->newChild(nn);
+        } else if (current.type == T_RETURN){
+            node* nn = new node(T_RETURN_BLOCK);
+            parse_procedure_return_statement(nn);
+            n->newChild(nn);
+        }
+    }
+}
+void parser::parse_procedure_return_statement(node *n){
+
+    node* return_identifier = nullptr;
+    node* value = nullptr;
+
+    if (current.type == T_RETURN){
+        return_identifier = new node("return", T_RETURN);
+        consume_token();
+    }
+
+    get_value(value);
+
+    if (current.type == T_SEMICOLON && return_identifier != nullptr && value != nullptr){
+        n->newChild(return_identifier);
+        n->newChild(value);
+        consume_token();
+    }
 }
 
 /** Expressions **/
@@ -376,21 +487,7 @@ void parser::parse_variable_assignment(node *n) {
         consume_token();
     }
 
-
-    if (current.type == T_STRING_LITERAL){
-        value = node::create_string_literal_node(current.val.stringValue);
-        consume_token();
-    } else if (current.type == T_FALSE){
-        value = new node("false", T_FALSE);
-        consume_token();
-    } else if (current.type == T_TRUE){
-        value = new node("true", T_TRUE);
-        consume_token();
-    } else {
-        value = new node("", T_ARITH_OP);
-        parse_arith_op(value);
-    }
-
+    get_value(value);
 
     if (current.type == T_SEMICOLON){
         consume_token();
@@ -415,8 +512,6 @@ void parser::parse_variable_assignment(node *n) {
     } else{
         cout << "No semicolon" << endl;
     }
-
-
 }
 
 /** Block Comments **/
@@ -436,6 +531,25 @@ void parser::parse_block_comments() {
     }
 }
 
+/** Helpers and Code Reuse **/
+void parser::get_value(node *&n) {
+    if (current.type == T_STRING_LITERAL){
+        n = node::create_string_literal_node(current.val.stringValue);
+        consume_token();
+    } else if (current.type == T_FALSE){
+        n = new node("false", T_FALSE);
+        consume_token();
+    } else if (current.type == T_TRUE){
+        n = new node("true", T_TRUE);
+        consume_token();
+    } else {
+        n = new node("", T_ARITH_OP);
+        parse_arith_op(n);
+    }
+}
+
+
+
 void parser::printer_tokens(std::list<scanner::_token> tokens) {
     for (auto tt : tokens){
         cout << tt.type << " | ";
@@ -448,7 +562,6 @@ void parser::printer_tokens(std::list<scanner::_token> tokens) {
         cout << tt.line_number << endl;
     }
 }
-
 std::list<scanner::_token> parser::get_tokens(std::string file_text) {
     auto *s = new scanner(file_text + ' ');
     std::list<scanner::_token> tokens;
@@ -462,7 +575,6 @@ std::list<scanner::_token> parser::get_tokens(std::string file_text) {
 
     return tokens;
 }
-
 void parser::print_nodes(node *n, unsigned depth) {
     for (int i = 0; i <= depth; i++){
         std::cout << "---";
@@ -480,7 +592,6 @@ void parser::print_nodes(node *n, unsigned depth) {
         print_nodes(nn, depth + 1);
     }
 }
-
 void parser::print_node_leaves(node *n) {
     if (n->children.empty()){
         if (n->type == T_INTEGER_LITERAL){
@@ -540,11 +651,9 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
 }
 
 
-void parser::consume_token() {
-    current = next;
-    if (next.type != T_END_OF_FILE)
-        next = scan->get_next_token();
-}
+
+
+
 
 
 
