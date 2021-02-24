@@ -36,6 +36,7 @@ private:
     /** Built in Functionality **/
     void parse_if_block(node* n);
     void parse_if_statement_block(node* n);
+
     /** Expressions **/
     // Arithmetic
     void parse_arith_op(node* n);
@@ -56,8 +57,16 @@ private:
     /** Helpers and Code Reuse **/
     void get_value_node(node*& n);
     void get_boolean_node(node*& n);
-
+    bool run_until_true(node* n, std::list<std::function<bool()>> ll);
     bool is_current_relational_operator() const;
+
+    /** Processors **/
+    bool process_block_comments(node* n);
+    bool process_variable_declaration(node* n);
+    bool process_variable_assignment(node* n);
+    bool process_procedure_declaration(node* n);
+    bool process_if_block(node* n);
+    bool process_return_block(node* n);
 
     /** VISUALIZERS **/
     void printer_tokens();

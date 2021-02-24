@@ -7,8 +7,9 @@
 
 #include <iostream>
 #include <regex>
-#include <sstream>
-#include <fstream>
+
+using namespace std;
+using namespace std::placeholders;
 
 parser::parser(string file_text) {
 
@@ -19,6 +20,7 @@ parser::parser(string file_text) {
     next = scan->get_next_token();
 
     head = new node(T_PROGRAM_ROOT);
+
     parse_program(head);
     print_node_to_json(head);
 }
@@ -99,34 +101,24 @@ void parser::parse_program(node *n) {
 }
 void parser::parse_program_declaration_block(node *n) {
     while (current.type != T_BEGIN && current.type != T_END_OF_FILE){
-        if (current.type == T_BLOCK_COMMENT_OPEN){
-            parse_block_comments();
-        } else if (current.type == T_VARIABLE){
-            node* nn = new node(T_VARIABLE_DECLARATION);
-            parse_variable_declaration(nn);
-            n->newChild(nn);
-        } else if(current.type == T_PROCEDURE){
-            node* nn = new node(T_PROCEDURE_DECLARATION);
-            parse_procedure(nn);
-            n->newChild(nn);
-        }
+        std::list<std::function<bool()>> functionList;
+
+        functionList.emplace_back([this, n] { return process_block_comments(n); });
+        functionList.emplace_back([this, n] { return process_variable_declaration(n); });
+        functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
+
+        run_until_true(n, functionList);
     }
 }
 void parser::parse_program_statement_block(node *n){
     while (current.type != T_END && current.type != T_END_OF_FILE){
+        std::list<std::function<bool()>> functionList;
 
-        if (current.type == T_BLOCK_COMMENT_OPEN){
-            parse_block_comments();
-        } else if (current.type == T_IDENTIFIER){
-            // This is not gonna work lol
-            node* nn = new node(T_VARIABLE_ASSIGNMENT);
-            parse_variable_assignment(nn);
-            n->newChild(nn);
-        } else if (current.type == T_IF){
-            node* nn = new node(T_IF_BLOCK);
-            parse_if_block(nn);
-            n->newChild(nn);
-        }
+        functionList.emplace_back([this, n] { return process_block_comments(n); });
+        functionList.emplace_back([this, n] { return process_variable_assignment(n); });
+        functionList.emplace_back([this, n] { return process_if_block(n); });
+
+        run_until_true(n, functionList);
     }
 }
 
@@ -208,6 +200,9 @@ void parser::parse_procedure(node *n) {
 
         }
         consume_token();
+    } else {
+        throw runtime_error("Was expecting next token to be '(' on line " + std::to_string(current.line_number)
+            + ", but received " + current.val.stringValue + " instead.");
     }
 
     if (param_list != nullptr && !param_list->children.empty())
@@ -254,37 +249,25 @@ void parser::parse_procedure(node *n) {
 }
 void parser::parse_procedure_declaration_block(node *n) {
     while (current.type != T_BEGIN && current.type != T_END_OF_FILE){
-        if (current.type == T_BLOCK_COMMENT_OPEN){
-            parse_block_comments();
-        } else if (current.type == T_VARIABLE){
-            node* nn = new node(T_VARIABLE_DECLARATION);
-            parse_variable_declaration(nn);
-            n->newChild(nn);
-        } else if(current.type == T_PROCEDURE){
-            node* nn = new node(T_PROCEDURE_DECLARATION);
-            parse_procedure(nn);
-            n->newChild(nn);
-        }
+        std::list<std::function<bool()>> functionList;
+
+        functionList.emplace_back([this, n] { return process_block_comments(n); });
+        functionList.emplace_back([this, n] { return process_variable_declaration(n); });
+        functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
+
+        run_until_true(n, functionList);
     }
 }
 void parser::parse_procedure_statement_block(node *n){
     while (current.type != T_END && current.type != T_END_OF_FILE){
-        if (current.type == T_BLOCK_COMMENT_OPEN){
-            parse_block_comments();
-        } else if (current.type == T_IDENTIFIER){
-            // This is not gonna work lol
-            node* nn = new node(T_VARIABLE_ASSIGNMENT);
-            parse_variable_assignment(nn);
-            n->newChild(nn);
-        } else if (current.type == T_RETURN){
-            node* nn = new node(T_RETURN_BLOCK);
-            parse_procedure_return_statement(nn);
-            n->newChild(nn);
-        } else if (current.type == T_IF){
-            node* nn = new node(T_IF_BLOCK);
-            parse_if_block(nn);
-            n->newChild(nn);
-        }
+        std::list<std::function<bool()>> functionList;
+
+        functionList.emplace_back([this, n] { return process_block_comments(n); });
+        functionList.emplace_back([this, n] { return process_variable_assignment(n); });
+        functionList.emplace_back([this, n] { return process_return_block(n); });
+        functionList.emplace_back([this, n] { return process_if_block(n); });
+
+        run_until_true(n, functionList);
     }
 }
 void parser::parse_procedure_return_statement(node *n){
@@ -373,19 +356,14 @@ void parser::parse_if_block(node *n) {
 }
 void parser::parse_if_statement_block(node *n){
     while (current.type != T_END && current.type != T_ELSE && current.type != T_END_OF_FILE){
+        std::list<std::function<bool()>> functionList;
 
-        if (current.type == T_BLOCK_COMMENT_OPEN){
-            parse_block_comments();
-        } else if (current.type == T_IDENTIFIER){
-            // This is not gonna work lol
-            node* nn = new node(T_VARIABLE_ASSIGNMENT);
-            parse_variable_assignment(nn);
-            n->newChild(nn);
-        } else if (current.type == T_IF){
-            node* nn = new node(T_IF_BLOCK);
-            parse_if_block(nn);
-            n->newChild(nn);
-        }
+        functionList.emplace_back([this, n] { return process_block_comments(n); });
+        functionList.emplace_back([this, n] { return process_variable_assignment(n); });
+        functionList.emplace_back([this, n] { return process_return_block(n); });
+        functionList.emplace_back([this, n] { return process_if_block(n); });
+
+        run_until_true(n, functionList);
     }
 }
 
@@ -674,13 +652,76 @@ void parser::get_boolean_node(node *&n){
         parse_arith_op(n);
     }
 }
-
+bool parser::run_until_true(node* n, std::list<std::function<bool()>> ll) {
+    while (!ll.empty()){
+        if (ll.front()()){
+            return true;
+        }
+        ll.pop_front();
+    }
+    return false;
+}
 bool parser::is_current_relational_operator() const {
     return current.type >= T_L_THAN && current.type <= T_N_EQUALS;
 }
 
+/** Processors **/
+bool parser::process_block_comments(node* n) {
+    if (current.type == T_BLOCK_COMMENT_OPEN){
+        parse_block_comments();
+        return true;
+    }
+    return false;
+}
+bool parser::process_variable_declaration(node* n) {
+    if (current.type == T_VARIABLE){
+        node* nn = new node(T_VARIABLE_DECLARATION);
+        parse_variable_declaration(nn);
+        n->newChild(nn);
+        return true;
+    }
+    return false;
+}
+bool parser::process_variable_assignment(node* n) {
+    if (current.type == T_IDENTIFIER){
+        // TODO -  This is not gonna work lol
+        node* nn = new node(T_VARIABLE_ASSIGNMENT);
+        parse_variable_assignment(nn);
+        n->newChild(nn);
+        return true;
+    }
+    return false;
+}
+bool parser::process_procedure_declaration(node* n) {
+    if(current.type == T_PROCEDURE){
+        node* nn = new node(T_PROCEDURE_DECLARATION);
+        parse_procedure(nn);
+        n->newChild(nn);
+        return true;
+    }
+    return false;
+}
+bool parser::process_if_block(node* n) {
+    if (current.type == T_IF){
+        node* nn = new node(T_IF_BLOCK);
+        parse_if_block(nn);
+        n->newChild(nn);
+        return true;
+    }
+    return false;
+}
+bool parser::process_return_block(node* n) {
+    if (current.type == T_RETURN){
+        node* nn = new node(T_RETURN_BLOCK);
+        parse_procedure_return_statement(nn);
+        n->newChild(nn);
+        return true;
+    }
+    return false;
+}
 
 
+/** VISUALIZERS **/
 void parser::printer_tokens() {
     while(current.type != T_END_OF_FILE){
         cout << current.type << " | ";
@@ -782,7 +823,6 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
         file_id->close();
     }
 }
-
 
 
 
