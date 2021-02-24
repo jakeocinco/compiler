@@ -19,8 +19,7 @@ parser::parser(string file_text) {
     next = scan->get_next_token();
 
     head = new node(T_PROGRAM_ROOT);
-//    parse_program(head);
-    parse_logical_op(head);
+    parse_program(head);
     print_node_to_json(head);
 }
 
@@ -122,6 +121,10 @@ void parser::parse_program_statement_block(node *n){
             // This is not gonna work lol
             node* nn = new node(T_VARIABLE_ASSIGNMENT);
             parse_variable_assignment(nn);
+            n->newChild(nn);
+        } else if (current.type == T_IF){
+            node* nn = new node(T_IF_BLOCK);
+            parse_if_block(nn);
             n->newChild(nn);
         }
     }
@@ -277,6 +280,10 @@ void parser::parse_procedure_statement_block(node *n){
             node* nn = new node(T_RETURN_BLOCK);
             parse_procedure_return_statement(nn);
             n->newChild(nn);
+        } else if (current.type == T_IF){
+            node* nn = new node(T_IF_BLOCK);
+            parse_if_block(nn);
+            n->newChild(nn);
         }
     }
 }
@@ -296,6 +303,89 @@ void parser::parse_procedure_return_statement(node *n){
         n->newChild(return_identifier);
         n->newChild(value);
         consume_token();
+    }
+}
+
+/** Built in Functionality **/
+void parser::parse_if_block(node *n) {
+    node* if_identifier = nullptr;
+    node* logical_expression = nullptr;
+    node* then_identifier = nullptr;
+    node* if_statement_block = new node(T_LOGICAL_OP_STATEMENT_BLOCK);
+
+    node* else_identifier = nullptr;
+    node* else_statement_block = new node(T_LOGICAL_OP_STATEMENT_BLOCK);
+
+    node* end_identifier = nullptr;
+    node* end_if_statement_block = nullptr;
+
+    if (current.type == T_IF){
+        if_identifier = new node("if", T_IDENTIFIER);
+        consume_token();
+    }
+    if (current.type == T_LPAREN){
+        consume_token();
+
+        logical_expression = new node(T_LOGICAL_OP);
+        parse_logical_op(logical_expression);
+
+        if (current.type == T_RPAREN){
+            consume_token();
+        }
+    }
+    if (current.type == T_THEN){
+        then_identifier = new node("then", T_THEN);
+        consume_token();
+    }
+    parse_if_statement_block(if_statement_block);
+
+    if (current.type == T_ELSE){
+        else_identifier = new node("else", T_ELSE);
+        consume_token();
+
+        parse_if_statement_block(else_statement_block);
+    }
+
+    if (current.type == T_END){
+        end_identifier = new node("end", T_END);
+        consume_token();
+    }
+    if (current.type == T_IF){
+        end_if_statement_block = new node("if", T_IF);
+        consume_token();
+    }
+
+    if (if_identifier != nullptr && logical_expression != nullptr && then_identifier != nullptr
+            && end_identifier != nullptr && end_if_statement_block != nullptr){
+
+        n->newChild(if_identifier);
+        n->newChild(logical_expression);
+        n->newChild(then_identifier);
+        n->newChild(if_statement_block);
+
+        if (else_identifier != nullptr){
+            n->newChild(else_identifier);
+            n->newChild(else_statement_block);
+        }
+        n->newChild(end_identifier);
+        n->newChild(end_if_statement_block);
+    }
+}
+void parser::parse_if_statement_block(node *n){
+    while (current.type != T_END && current.type != T_ELSE && current.type != T_END_OF_FILE){
+
+        if (current.type == T_BLOCK_COMMENT_OPEN){
+            parse_block_comments();
+        } else if (current.type == T_IDENTIFIER){
+            // This is not gonna work lol
+            node* nn = new node(T_VARIABLE_ASSIGNMENT);
+            parse_variable_assignment(nn);
+            n->newChild(nn);
+        } else if (current.type == T_IF){
+            node* nn = new node(T_IF_BLOCK);
+            parse_if_block(nn);
+            n->newChild(nn);
+        }
     }
 }
 
@@ -585,7 +675,7 @@ void parser::get_boolean_node(node *&n){
     }
 }
 
-bool parser::is_current_relational_operator() {
+bool parser::is_current_relational_operator() const {
     return current.type >= T_L_THAN && current.type <= T_N_EQUALS;
 }
 
@@ -692,6 +782,7 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
         file_id->close();
     }
 }
+
 
 
 

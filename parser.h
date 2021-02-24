@@ -33,6 +33,9 @@ private:
     void parse_procedure_statement_block(node* n);
     void parse_procedure_return_statement(node* n);
 
+    /** Built in Functionality **/
+    void parse_if_block(node* n);
+    void parse_if_statement_block(node* n);
     /** Expressions **/
     // Arithmetic
     void parse_arith_op(node* n);
@@ -54,7 +57,7 @@ private:
     void get_value_node(node*& n);
     void get_boolean_node(node*& n);
 
-    bool is_current_relational_operator();
+    bool is_current_relational_operator() const;
 
     /** VISUALIZERS **/
     void printer_tokens();

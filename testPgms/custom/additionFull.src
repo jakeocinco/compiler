@@ -7,8 +7,11 @@ program test_program is
             return "Jake";
         end procedure;
 begin
-
-    a := 2+10/5*9;
+    if (1 > 0) then
+        a := 2+10/5*9;
+    else
+        a := 10/5*9;
+    end if
     //a := 9;
     b := "jake"; // hello
 end program .
