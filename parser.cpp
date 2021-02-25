@@ -124,7 +124,6 @@ void parser::parse_program_statement_block(node *n){
 
 /** Procedures **/
 void parser::parse_procedure(node *n) {
-
     try {
         n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
         n->newChild(expecting_identifier());
@@ -132,25 +131,25 @@ void parser::parse_procedure(node *n) {
         n->newChild(expecting_type());
 
         if (current.type == T_LPAREN) {
+
+            bool isFirstRun = true;
             node *param_list = new node(T_PARAMETER_LIST);
+
             while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
-                consume_token();
+                if (isFirstRun){
+                    isFirstRun = false;
+                    expecting_reserved_word(T_LPAREN, "(");
+                } else {
+                    expecting_reserved_word(T_COMMA, ",");
+                }
 
                 node *param = new node(T_PARAMETER);
-
-                /* TODO can this use variable declaration block?? */
-                param->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
-                param->newChild(expecting_identifier());
-                param->newChild(expecting_reserved_word(T_COLON, ":"));
-                param->newChild(expecting_type());
+                parse_variable_declaration(param);
 
                 param_list->newChild(param);
             }
-            if (current.type != T_RPAREN) {
-                throw_unexpected_token("(", current.val.stringValue,
-                                       " All procedure headers must end with (<parameter_list>).");
-            }
-            consume_token();
+
+            expecting_reserved_word(T_RPAREN, ")");
 
             if (!param_list->children.empty()) {
                 n->newChild(param_list);
@@ -181,7 +180,6 @@ void parser::parse_procedure(node *n) {
     } catch (runtime_error& error){
         cout << error.what() << endl;
     }
-
 }
 void parser::parse_procedure_declaration_block(node *n) {
     while (current.type != T_BEGIN && current.type != T_END_OF_FILE){
@@ -416,140 +414,36 @@ void parser::parse_logical_op(node *n) {
 /** Variables **/
 void parser::parse_variable_declaration(node *n) {
     /** TODO: ADD TO TABLE **/
-    node* variable_identifier = NULL;
-    node* variable_name = NULL;
-    node* colon_identifier = NULL;
-    node* type_identifier = NULL;
 
-    node* l_bracket_identifier = NULL;
-    node* array_size = NULL;
-    node* r_bracket_identifier = NULL;
-    bool isArray = false;
-
-    if (current.type == T_VARIABLE){
-        variable_identifier = new node("variable", T_VARIABLE);
-        consume_token();
-    }
-    if (current.type == T_IDENTIFIER){
-        variable_name = new node(current.val.stringValue, T_IDENTIFIER);
-        consume_token();
-    }
-    if (current.type == T_COLON){
-        colon_identifier = new node(":", T_COLON);
-        consume_token();
-    }
-
-    if (current.type == T_INTEGER_TYPE){
-        type_identifier = new node(current.val.stringValue, T_INTEGER_TYPE);
-    } else if (current.type == T_FLOAT_TYPE){
-        type_identifier = new node(current.val.stringValue, T_FLOAT_TYPE);
-    } else if (current.type == T_STRING_TYPE){
-        type_identifier = new node(current.val.stringValue, T_STRING_TYPE);
-    }
-    consume_token();
+    n->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
+    n->newChild(expecting_identifier());
+    n->newChild(expecting_reserved_word(T_COLON, ":"));
+    n->newChild(expecting_type());
 
     if (current.type == T_LBRACKET){
-        l_bracket_identifier = new node(current.val.stringValue, T_LBRACKET);
-        isArray = true;
-        consume_token();
-    }
-    if (current.type == T_INTEGER_LITERAL){
-        array_size = node::create_integer_literal_node(current.val.intValue);
-        isArray = true;
-        consume_token();
-    }
-    if (current.type == T_RBRACKET){
-        r_bracket_identifier = new node(current.val.stringValue, T_RBRACKET);
-        isArray = true;
-        consume_token();
-    }
 
-    if (current.type == T_SEMICOLON){
-        consume_token();
-        if ( variable_identifier != NULL && variable_name != NULL &&
-                colon_identifier != NULL && type_identifier != NULL ){
-            if ((l_bracket_identifier != NULL && array_size != NULL &&
-                    r_bracket_identifier != NULL) || !isArray){
-                n->newChild(variable_identifier);
-                n->newChild(variable_name);
-                n->newChild(colon_identifier);
-                n->newChild(type_identifier);
-                if (isArray){
-                    n->newChild(l_bracket_identifier);
-                    n->newChild(array_size);
-                    n->newChild(r_bracket_identifier);
-                }
-            }
-        } else {
-            cout << "ERROR" << endl;
-        }
+        n->newChild(expecting_reserved_word(T_LBRACKET, "["));
+        n->newChild(expecting_literal(T_INTEGER_LITERAL));
+        n->newChild(expecting_reserved_word(T_RBRACKET, "]"));
     }
 }
 void parser::parse_variable_assignment(node *n) {
 
-    node* variable = NULL;
+    /** TODO: Check scope **/
+    n->newChild(expecting_identifier());
 
-    node* l_bracket_identifier = NULL;
-    node* array_size = NULL;
-    node* r_bracket_identifier = NULL;
-    bool isArray = false;
-
-    node* assignment_sign = NULL;
-    node* value = NULL;
-
-    if (current.type == T_IDENTIFIER){
-        /** TODO: Check scope **/
-
-        variable = new node(current.val.stringValue, T_IDENTIFIER);
-        consume_token();
+    if (T_LBRACKET == current.type){
+        n->newChild(expecting_reserved_word(T_LBRACKET, "["));
+        n->newChild(expecting_literal(T_INTEGER_LITERAL));
+        n->newChild(expecting_reserved_word(T_RBRACKET, "]"));
     }
-    if (current.type == T_LBRACKET){
-        l_bracket_identifier = new node(current.val.stringValue, T_LBRACKET);
-        isArray = true;
-        consume_token();
-    }
-    if (current.type == T_INTEGER_LITERAL){
-        array_size = node::create_integer_literal_node(current.val.intValue);
-        isArray = true;
-        consume_token();
-    }
-    if (current.type == T_RBRACKET){
-        r_bracket_identifier = new node(current.val.stringValue, T_RBRACKET);
-        isArray = true;
-        consume_token();
-    }
-
     // Can stuff like this be stripped yet -- kinda like semi colons
-    if (current.type == T_COLON_EQUALS){
-        assignment_sign = new node(current.val.stringValue, T_COLON_EQUALS);
-        consume_token();
-    }
+    n->newChild(expecting_reserved_word(T_COLON_EQUALS, ":="));
 
+    node* value = nullptr;
     get_value_node(value);
 
-    if (current.type == T_SEMICOLON){
-        consume_token();
-        if ( variable != NULL && assignment_sign != NULL &&
-             value != NULL){
-            if ((l_bracket_identifier != NULL && array_size != NULL &&
-                 r_bracket_identifier != NULL) || !isArray) {
-                n->newChild(variable);
-                if (isArray) {
-                    n->newChild(l_bracket_identifier);
-                    n->newChild(array_size);
-                    n->newChild(r_bracket_identifier);
-                }
-                n->newChild(assignment_sign);
-                n->newChild(value);
-            } else {
-                cout << "ERROR 1";
-            }
-        } else {
-            cout << "ERROR 2, size: " << assignment_sign << variable << value->children.size();
-        }
-    } else{
-        cout << "No semicolon" << endl;
-    }
+    expecting_reserved_word(T_SEMICOLON, ";");
 }
 
 /** Block Comments **/
@@ -638,6 +532,31 @@ node*  parser::expecting_type() {
     throw_unexpected_token_wanted_type(current.val.stringValue);
     return nullptr;
 }
+node*  parser::expecting_literal(int expected_type) {
+    if ((expected_type == T_INTEGER_LITERAL) || (expected_type < 0 && current.type == T_INTEGER_LITERAL)){
+        node* n = node::create_integer_literal_node(current.val.intValue);
+        consume_token();
+        return n;
+    } else if ((expected_type == T_FLOAT_LITERAL) || (expected_type < 0 && current.type == T_FLOAT_LITERAL)){
+        node* n = node::create_double_literal_node(current.val.doubleValue);
+        consume_token();
+        return n;
+    } else if ((expected_type == T_STRING_LITERAL) || (expected_type < 0 && current.type == T_STRING_LITERAL)){
+        node* n = node::create_string_literal_node(current.val.stringValue);
+        consume_token();
+        return n;
+    } else if ((expected_type == T_FALSE) || (expected_type < 0 && current.type == T_FALSE)
+                || (expected_type == T_TRUE) || (expected_type < 0 && current.type == T_TRUE)){
+        node* n = new node((current.type == T_FALSE ? "false" : "true"), current.type);
+        consume_token();
+        return n;
+    }
+
+    // TODO - enums and custom types
+
+    throw_unexpected_token_wanted_literal(current.val.stringValue);
+    return nullptr;
+}
 
 /** Processors **/
 bool parser::process_block_comments(node* n) {
@@ -651,6 +570,7 @@ bool parser::process_variable_declaration(node* n) {
     if (current.type == T_VARIABLE){
         node* nn = new node(T_VARIABLE_DECLARATION);
         parse_variable_declaration(nn);
+        expecting_reserved_word(T_SEMICOLON, ";");
         n->newChild(nn);
         return true;
     }
@@ -704,6 +624,10 @@ void parser::throw_unexpected_token(const string& expected_token, const string& 
 }
 void parser::throw_unexpected_token_wanted_type(const string& received_token, const string& extra_message) {
     throw_runtime_template("Was expecting next token to be a type identifier, but received '"
+            + received_token + "' instead." + extra_message);
+}
+void parser::throw_unexpected_token_wanted_literal(const string& received_token, const string& extra_message) {
+    throw_runtime_template("Was expecting next token to be a value, but received '"
             + received_token + "' instead." + extra_message);
 }
 void parser::throw_unexpected_reserved_word(const string& received_token, const string& extra_message) {

@@ -63,6 +63,7 @@ private:
     node* expecting_reserved_word(int expected_type, const string& expected_value);
     node* expecting_identifier();
     node* expecting_type();
+    node* expecting_literal(int expected_type = -1);
 
     /** Processors **/
     bool process_block_comments(node* n);
@@ -76,6 +77,7 @@ private:
     void throw_runtime_template(const string& message);
     void throw_unexpected_token(const string& expected_token, const string& received_token, const string& extra_message = "");
     void throw_unexpected_token_wanted_type(const string& received_token, const string& extra_message = "");
+    void throw_unexpected_token_wanted_literal(const string& received_token, const string& extra_message = "");
     void throw_unexpected_reserved_word(const string& received_token, const string& extra_message = "");
 
     /** VISUALIZERS **/
