@@ -1,11 +1,11 @@
 program test_program is
     variable a : integer;
 //    variable x : float;
-    procedure getName : string()
+    procedure getName : string(variable x : string)
         variable name : string;
         begin
             return "Jake";
-        end procedure;
+        end procedure
 begin
     if (1 > 0) then
         a := 2+10/5*9;

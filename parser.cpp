@@ -107,7 +107,7 @@ void parser::parse_program_declaration_block(node *n) {
         functionList.emplace_back([this, n] { return process_variable_declaration(n); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
 
-        run_until_true(n, functionList);
+        run_processes_until_true(n, functionList);
     }
 }
 void parser::parse_program_statement_block(node *n){
@@ -118,132 +118,68 @@ void parser::parse_program_statement_block(node *n){
         functionList.emplace_back([this, n] { return process_variable_assignment(n); });
         functionList.emplace_back([this, n] { return process_if_block(n); });
 
-        run_until_true(n, functionList);
+        run_processes_until_true(n, functionList);
     }
 }
 
 /** Procedures **/
 void parser::parse_procedure(node *n) {
-    node* procedure_identifier = nullptr;
-    node* procedure_name = nullptr;
-    node* colon_identifier = nullptr;
-    node* return_type = nullptr;
 
-    if (current.type == T_PROCEDURE){
-        procedure_identifier = new node("procedure", T_PROCEDURE);
-        consume_token();
-    }
-    if (current.type == T_IDENTIFIER){
-        procedure_name = new node(current.val.stringValue, T_IDENTIFIER);
-        consume_token();
-    }
-    if (current.type == T_COLON){
-        colon_identifier = new node(":", T_COLON);
-        consume_token();
-    }
-    if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
-            current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
-        return_type = new node(current.val.stringValue, current.type);
-        consume_token();
-    }
+    try {
+        n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
+        n->newChild(expecting_identifier());
+        n->newChild(expecting_reserved_word(T_COLON, ":"));
+        n->newChild(expecting_type());
 
-    if (procedure_identifier != nullptr && procedure_name != nullptr
-            && colon_identifier != nullptr && return_type != nullptr){
-        n->newChild(procedure_identifier);
-        n->newChild(procedure_name);
-        n->newChild(colon_identifier);
-        n->newChild(return_type);
-
-    }
-    // Throw error on else
-
-    node* param_list = nullptr;
-    if (current.type == T_LPAREN){
-        param_list = new node("(", T_PARAMETER_LIST);
-        while(current.type != T_RPAREN){
-            consume_token();
-
-            node* variable_identifier = nullptr;
-            node* variable_name = nullptr;
-            node* variable_colon_identifier = nullptr;
-            node* variable_type_identifier = nullptr;
-
-            if (current.type == T_VARIABLE){
-                variable_identifier = new node("variable", T_PROCEDURE);
+        if (current.type == T_LPAREN) {
+            node *param_list = new node(T_PARAMETER_LIST);
+            while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
                 consume_token();
-            }
-            if (current.type == T_IDENTIFIER){
-                variable_name = new node(current.val.stringValue, T_IDENTIFIER);
-                consume_token();
-            }
-            if (current.type == T_COLON){
-                variable_colon_identifier = new node(":", T_COLON);
-                consume_token();
-            }
-            if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
-                    current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
-                variable_type_identifier = new node(current.val.stringValue, current.type);
-                consume_token();
-            }
 
-            if (variable_identifier != nullptr && variable_name != nullptr
-                    && variable_colon_identifier != nullptr && variable_type_identifier != nullptr){
-                node* param = new node(T_PARAMETER);
+                node *param = new node(T_PARAMETER);
 
-                param->newChild(variable_identifier);
-                param->newChild(variable_name);
-                param->newChild(variable_colon_identifier);
-                param->newChild(variable_type_identifier);
+                /* TODO can this use variable declaration block?? */
+                param->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
+                param->newChild(expecting_identifier());
+                param->newChild(expecting_reserved_word(T_COLON, ":"));
+                param->newChild(expecting_type());
 
                 param_list->newChild(param);
             }
+            if (current.type != T_RPAREN) {
+                throw_unexpected_token("(", current.val.stringValue,
+                                       " All procedure headers must end with (<parameter_list>).");
+            }
+            consume_token();
 
+            if (!param_list->children.empty()) {
+                n->newChild(param_list);
+            }
+        } else {
+            throw_unexpected_token("(", current.val.stringValue,
+                                   " All procedure headers must end with (<parameter_list>).");
         }
-        consume_token();
-    } else {
-        throw runtime_error("Was expecting next token to be '(' on line " + std::to_string(current.line_number)
-            + ", but received " + current.val.stringValue + " instead.");
-    }
 
-    if (param_list != nullptr && !param_list->children.empty())
-        n->newChild(param_list);
-    // Throw error on else
+        /** Process declaration block **/
+        // TODO - can this be made into a function
+        node *declarations = new node(T_PROCEDURE_DECLARATION_BLOCK);
+        parse_procedure_declaration_block(declarations);
+        if (!declarations->children.empty())
+            n->newChild(declarations);
 
-    /** Process declaration block **/
-    node* declarations = new node(T_PROCEDURE_DECLARATION_BLOCK);
-    parse_procedure_declaration_block(declarations);
-    n->newChild(declarations);
+        n->newChild(expecting_reserved_word(T_BEGIN, "begin"));
 
-    node* begin_identifier = NULL;
-    if (current.type == T_BEGIN){
-        begin_identifier = new node("begin", T_BEGIN);
-        consume_token();
-    }
-    if (begin_identifier != NULL){
-        n->newChild(begin_identifier);
-    }
+        /** Process statement block **/
+        // TODO - can this be made into a function
+        node *statement = new node(T_PROCEDURE_STATEMENT_BLOCK);
+        parse_procedure_statement_block(statement);
+        if (!declarations->children.empty())
+            n->newChild(statement);
 
-    /** Process statement block **/
-    node* statement = new node(T_PROCEDURE_STATEMENT_BLOCK);
-    parse_procedure_statement_block(statement);
-    n->newChild(statement);
-
-    node* end_identifier = NULL;
-    node* end_procedure_identifier = NULL;
-    if (current.type == T_END){
-        end_identifier = new node("end", T_END);
-        consume_token();
-    }
-    if (current.type == T_PROCEDURE){
-        end_procedure_identifier = new node("procedure", T_PROCEDURE);
-        consume_token();
-    }
-
-    if (current.type == T_SEMICOLON && end_identifier != nullptr && end_procedure_identifier != nullptr){
-        n->newChild(end_identifier);
-        n->newChild(end_procedure_identifier);
-
-        consume_token();
+        n->newChild(expecting_reserved_word(T_END, "end"));
+        n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
+    } catch (runtime_error& error){
+        cout << error.what() << endl;
     }
 
 }
@@ -255,7 +191,7 @@ void parser::parse_procedure_declaration_block(node *n) {
         functionList.emplace_back([this, n] { return process_variable_declaration(n); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
 
-        run_until_true(n, functionList);
+        run_processes_until_true(n, functionList);
     }
 }
 void parser::parse_procedure_statement_block(node *n){
@@ -267,25 +203,24 @@ void parser::parse_procedure_statement_block(node *n){
         functionList.emplace_back([this, n] { return process_return_block(n); });
         functionList.emplace_back([this, n] { return process_if_block(n); });
 
-        run_until_true(n, functionList);
+        run_processes_until_true(n, functionList);
     }
 }
 void parser::parse_procedure_return_statement(node *n){
 
-    node* return_identifier = nullptr;
+    n->newChild(expecting_reserved_word(T_RETURN, "return"));
+
     node* value = nullptr;
-
-    if (current.type == T_RETURN){
-        return_identifier = new node("return", T_RETURN);
-        consume_token();
-    }
-
     get_value_node(value);
 
-    if (current.type == T_SEMICOLON && return_identifier != nullptr && value != nullptr){
-        n->newChild(return_identifier);
+    if (current.type == T_SEMICOLON && value != nullptr){
         n->newChild(value);
         consume_token();
+    } else {
+        if (value == nullptr)
+            throw_runtime_template("Could not calculate valid return value.");
+        else
+            throw_unexpected_token(";", current.val.stringValue);
     }
 }
 
@@ -363,7 +298,7 @@ void parser::parse_if_statement_block(node *n){
         functionList.emplace_back([this, n] { return process_return_block(n); });
         functionList.emplace_back([this, n] { return process_if_block(n); });
 
-        run_until_true(n, functionList);
+        run_processes_until_true(n, functionList);
     }
 }
 
@@ -447,6 +382,7 @@ void parser::parse_factor(node* n) {
 }
 // Logic
 void parser::parse_logical_op(node *n) {
+    bool single_op = false;
     node* left_hand_value = nullptr;
     node* operator_identifier = nullptr;
     node* right_hand_value = nullptr;
@@ -457,6 +393,7 @@ void parser::parse_logical_op(node *n) {
         operator_identifier = new node(current.val.stringValue, current.type);
         consume_token();
         get_boolean_node(right_hand_value);
+        single_op = true;
     }
 
     if (left_hand_value != nullptr ){
@@ -464,6 +401,14 @@ void parser::parse_logical_op(node *n) {
             n->newChild(left_hand_value);
             n->newChild(operator_identifier);
             n->newChild(right_hand_value);
+        } else if(single_op){
+            if (operator_identifier != nullptr){
+                new runtime_error("Was expecting operator (<, >, <=, >=, !=, ==), but none was received.");
+            } else if (right_hand_value != nullptr){
+                string s1 = "Was expecting expression on right side after ";
+                new runtime_error(s1 + operator_identifier->val.stringValue + ", but a valid expression was not recieved.");
+
+            }
         }
     }
 }
@@ -646,23 +591,52 @@ void parser::get_boolean_node(node *&n){
         consume_token();
     } else if (current.type == T_TRUE){
         n = new node("true", T_TRUE);
-        consume_token();
+        consume_token(); 
     } else {
         n = new node("", T_ARITH_OP);
         parse_arith_op(n);
     }
 }
-bool parser::run_until_true(node* n, std::list<std::function<bool()>> ll) {
+void parser::run_processes_until_true(node* n, std::list<std::function<bool()>> ll) {
     while (!ll.empty()){
         if (ll.front()()){
-            return true;
+            return;
         }
         ll.pop_front();
     }
-    return false;
+    throw runtime_error("No valid processes were found.");
 }
 bool parser::is_current_relational_operator() const {
     return current.type >= T_L_THAN && current.type <= T_N_EQUALS;
+}
+
+node*  parser::expecting_reserved_word(int expected_type, const string& expected_value) {
+    if (current.type == expected_type){
+        node* n = new node(expected_value, expected_type);
+        consume_token();
+        return n;
+    }
+    throw_unexpected_token(expected_value, current.val.stringValue);
+    return nullptr;
+}
+node*  parser::expecting_identifier() {
+    if (current.type == T_IDENTIFIER){
+        node* n = new node(current.val.stringValue, T_IDENTIFIER);
+        consume_token();
+        return n;
+    }
+    throw_unexpected_reserved_word(current.val.stringValue);
+    return nullptr;
+}
+node*  parser::expecting_type() {
+    if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
+            current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
+        node* n = new node(current.val.stringValue, current.type);
+        consume_token();
+        return n;
+    }
+    throw_unexpected_token_wanted_type(current.val.stringValue);
+    return nullptr;
 }
 
 /** Processors **/
@@ -720,6 +694,22 @@ bool parser::process_return_block(node* n) {
     return false;
 }
 
+/** Error Handling **/
+void parser::throw_runtime_template(const string& message) {
+    throw runtime_error("Line Number: " + std::to_string(current.line_number) + " | " + message);
+}
+void parser::throw_unexpected_token(const string& expected_token, const string& received_token, const string& extra_message) {
+    throw_runtime_template("Was expecting next token to be '" + expected_token + "', but received '"
+            + received_token + "' instead." + extra_message);
+}
+void parser::throw_unexpected_token_wanted_type(const string& received_token, const string& extra_message) {
+    throw_runtime_template("Was expecting next token to be a type identifier, but received '"
+            + received_token + "' instead." + extra_message);
+}
+void parser::throw_unexpected_reserved_word(const string& received_token, const string& extra_message) {
+    throw_runtime_template("Was expecting variable identifier but received '"
+            + received_token + "' instead." + extra_message);
+}
 
 /** VISUALIZERS **/
 void parser::printer_tokens() {
@@ -823,22 +813,4 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
         file_id->close();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

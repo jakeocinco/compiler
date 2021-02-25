@@ -57,8 +57,12 @@ private:
     /** Helpers and Code Reuse **/
     void get_value_node(node*& n);
     void get_boolean_node(node*& n);
-    bool run_until_true(node* n, std::list<std::function<bool()>> ll);
+    static void run_processes_until_true(node* n, std::list<std::function<bool()>> ll);
     bool is_current_relational_operator() const;
+
+    node* expecting_reserved_word(int expected_type, const string& expected_value);
+    node* expecting_identifier();
+    node* expecting_type();
 
     /** Processors **/
     bool process_block_comments(node* n);
@@ -67,6 +71,12 @@ private:
     bool process_procedure_declaration(node* n);
     bool process_if_block(node* n);
     bool process_return_block(node* n);
+
+    /** Error Handling **/
+    void throw_runtime_template(const string& message);
+    void throw_unexpected_token(const string& expected_token, const string& received_token, const string& extra_message = "");
+    void throw_unexpected_token_wanted_type(const string& received_token, const string& extra_message = "");
+    void throw_unexpected_reserved_word(const string& received_token, const string& extra_message = "");
 
     /** VISUALIZERS **/
     void printer_tokens();
