@@ -12,6 +12,6 @@ begin
     else
         a := 10/5*9;
     end if
-    //a := 9;
+    a := 9;
     b := "jake"; // hello
 end program .

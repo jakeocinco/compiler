@@ -130,7 +130,7 @@ std::map<string, int> scanner::get_reserved_words() {
 }
 
 bool scanner::is_delimiter(string s) {
-    std::list<string> l = { "&","|","*","/","+","-","(",")","[","]",",",".",":",";","=",">","<","!"};
+    std::list<string> l = { "&","|","*","/","+","-","(",")","[","]",",",":",";","=",">","<","!"};
     return (std::find(std::begin(l), std::end(l), s) != std::end(l));
 }
 

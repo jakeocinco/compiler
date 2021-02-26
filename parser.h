@@ -23,40 +23,41 @@ private:
     void consume_token();
 
     /** Program Level **/
-    void parse_program(node* n);
-    void parse_program_declaration_block(node* n);
-    void parse_program_statement_block(node* n);
+    node* parse_program();
+    node* parse_program_declaration_block();
+    node* parse_program_statement_block();
 
     /** Procedures **/
-    void parse_procedure(node* n);
-    void parse_procedure_declaration_block(node* n);
-    void parse_procedure_statement_block(node* n);
-    void parse_procedure_return_statement(node* n);
+    node* parse_procedure();
+    node* parse_procedure_declaration_block();
+    node* parse_procedure_statement_block();
+    node* parse_procedure_parameter_list();
+    node* parse_procedure_return_statement();
 
     /** Built in Functionality **/
-    void parse_if_block(node* n);
-    void parse_if_statement_block(node* n);
+    node* parse_if_block();
+    node* parse_if_statement_block();
 
     /** Expressions **/
     // Arithmetic
-    void parse_arith_op(node* n);
-    void parse_term(node* n);
-    void parse_arith_op_prime(node* n);
-    void parse_term_prime(node* n);
-    void parse_factor(node* n);
+    node* parse_arith_op();
+    node* parse_term();
+    node* parse_arith_op_prime();
+    node* parse_term_prime();
+    node* parse_factor();
     // Logic
-    void parse_logical_op(node *n);
+    node* parse_logical_op();
 
     /** Variables **/
-    void parse_variable_declaration(node* n);
-    void parse_variable_assignment(node* n);
+    node* parse_variable_declaration();
+    node* parse_variable_assignment();
 
     /** Block Comments **/
-    void parse_block_comments();
+    node* parse_block_comments();
 
     /** Helpers and Code Reuse **/
-    void get_value_node(node*& n);
-    void get_boolean_node(node*& n);
+    node* get_value_node();
+    node* get_boolean_node();
     static void run_processes_until_true(node* n, std::list<std::function<bool()>> ll);
     bool is_current_relational_operator() const;
 
@@ -74,7 +75,7 @@ private:
     bool process_return_block(node* n);
 
     /** Error Handling **/
-    void throw_runtime_template(const string& message);
+    void throw_runtime_template(const string& message) const;
     void throw_unexpected_token(const string& expected_token, const string& received_token, const string& extra_message = "");
     void throw_unexpected_token_wanted_type(const string& received_token, const string& extra_message = "");
     void throw_unexpected_token_wanted_literal(const string& received_token, const string& extra_message = "");

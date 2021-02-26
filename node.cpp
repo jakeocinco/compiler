@@ -16,7 +16,8 @@ node::node(std::string s, int type) {
 }
 
 void node::newChild(node* n) {
-    this->children.push_back(n);
+    if (n != nullptr)
+        this->children.push_back(n);
 }
 
 node* node::create_string_literal_node(std::string s) {
