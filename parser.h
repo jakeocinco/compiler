@@ -40,8 +40,8 @@ private:
 
     /** Expressions **/
     // Arithmetic
-    node* parse_arith_op();
-    node* parse_term();
+    node* parse_arith_op(node* n = nullptr);
+    node* parse_term(node* n = nullptr);
     node* parse_arith_op_prime();
     node* parse_term_prime();
     node* parse_factor();

@@ -214,30 +214,51 @@ node* parser::parse_if_statement_block(){
         run_processes_until_true(n, functionList);
     }
 
-    if (!n->children.empty())
+    if (n->children.empty())
         return nullptr;
     return n;
 }
 
 /** Expressions **/
 // Arithmetic
-node* parser::parse_arith_op() {
+node* parser::parse_arith_op(node* n) {
 
-    node* n = new node("", T_ARITH_OP);
+    if (n == nullptr)
+        n = new node("", T_ARITH_OP);
 
-    n->newChild(parse_term());
-    n->newChild(parse_arith_op_prime());
+    if (current.type == T_LPAREN){
+        expecting_reserved_word(T_LPAREN, "(");
+        n->newChild(parse_arith_op());
+        expecting_reserved_word(T_RPAREN, ")");
+
+        n->newChild(parse_term_prime());
+        n->newChild(parse_arith_op_prime());
+    } else {
+        n->newChild(parse_term());
+        n->newChild(parse_arith_op_prime());
+    }
 
     if (n->children.empty())
         return nullptr;
     return n;
 }
-node* parser::parse_term() {
+node* parser::parse_term(node* n) {
 
-    node* n = new node(T_TERM);
+    if (n == nullptr)
+        n = new node(T_TERM);
 
-    n->newChild(parse_factor());
-    n->newChild(parse_term_prime());
+    if (current.type == T_LPAREN){
+
+        expecting_reserved_word(T_LPAREN, "(");
+        n->newChild(parse_arith_op());
+        expecting_reserved_word(T_RPAREN, ")");
+
+        n->newChild(parse_term_prime());
+        n->newChild(parse_arith_op_prime());
+    } else {
+        n->newChild(parse_factor());
+        n->newChild(parse_term_prime());
+    }
 
     if (n->children.empty())
         return nullptr;
@@ -252,7 +273,6 @@ node* parser::parse_arith_op_prime() {
         consume_token();
         n->newChild(symbol);
 
-        n->newChild(parse_term());
         n->newChild(parse_arith_op());
     }
 
@@ -269,9 +289,9 @@ node* parser::parse_term_prime() {
         consume_token();
         n->newChild(symbol);
 
-        n->newChild(parse_factor());
-        n->newChild(parse_term_prime());
+        parse_term(n);
     }
+
     if (n->children.empty())
         return nullptr;
     return n;
