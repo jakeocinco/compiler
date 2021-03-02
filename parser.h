@@ -37,16 +37,15 @@ private:
     /** Built in Functionality **/
     node* parse_if_block();
     node* parse_if_statement_block();
+    node* parse_for_loop();
+    node* parse_for_loop_statement_block();
 
     /** Expressions **/
-    // Arithmetic
-    node* parse_arith_op(node* n = nullptr);
+    node* parse_expression(node* n = nullptr);
+    node* parse_relation(node* n = nullptr);
+    node* parse_arith(node* n = nullptr);
     node* parse_term(node* n = nullptr);
-    node* parse_arith_op_prime();
-    node* parse_term_prime();
     node* parse_factor();
-    // Logic
-    node* parse_logical_op();
 
     /** Variables **/
     node* parse_variable_declaration();
@@ -56,8 +55,6 @@ private:
     node* parse_block_comments();
 
     /** Helpers and Code Reuse **/
-    node* get_value_node();
-    node* get_boolean_node();
     static void run_processes_until_true(node* n, std::list<std::function<bool()>> ll);
     bool is_current_relational_operator() const;
 
@@ -72,6 +69,7 @@ private:
     bool process_variable_assignment(node* n);
     bool process_procedure_declaration(node* n);
     bool process_if_block(node* n);
+    bool process_for_block(node* n);
     bool process_return_block(node* n);
 
     /** Error Handling **/

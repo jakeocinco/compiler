@@ -78,6 +78,7 @@ node* parser::parse_program_statement_block(){
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_assignment(n); });
         functionList.emplace_back([this, n] { return process_if_block(n); });
+        functionList.emplace_back([this, n] { return process_for_block(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -139,6 +140,7 @@ node* parser::parse_procedure_statement_block(){
         functionList.emplace_back([this, n] { return process_variable_assignment(n); });
         functionList.emplace_back([this, n] { return process_return_block(n); });
         functionList.emplace_back([this, n] { return process_if_block(n); });
+        functionList.emplace_back([this, n] { return process_for_block(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -173,7 +175,7 @@ node* parser::parse_procedure_return_statement(){
     node* n = new node(T_RETURN_BLOCK);
 
     n->newChild(expecting_reserved_word(T_RETURN, "return"));
-    n->newChild(get_value_node());
+    n->newChild(parse_expression());
     expecting_reserved_word(T_SEMICOLON, ";");
 
     return n;
@@ -185,7 +187,7 @@ node* parser::parse_if_block() {
 
     n->newChild(expecting_reserved_word(T_IF, "if"));
     expecting_reserved_word(T_LPAREN, "(");
-    n->newChild(parse_logical_op());
+    n->newChild(parse_expression());
     expecting_reserved_word(T_RPAREN, ")");
     n->newChild(expecting_reserved_word(T_THEN, "then"));
     n->newChild(parse_if_statement_block());
@@ -210,6 +212,46 @@ node* parser::parse_if_statement_block(){
         functionList.emplace_back([this, n] { return process_variable_assignment(n); });
         functionList.emplace_back([this, n] { return process_return_block(n); });
         functionList.emplace_back([this, n] { return process_if_block(n); });
+        functionList.emplace_back([this, n] { return process_for_block(n); });
+
+        run_processes_until_true(n, functionList);
+    }
+
+    if (n->children.empty())
+        return nullptr;
+    return n;
+}
+
+/** For Loops **/
+node* parser::parse_for_loop() {
+    node* n = new node(T_FOR_LOOP);
+
+    n->newChild(expecting_reserved_word(T_FOR, "for"));
+    expecting_reserved_word(T_LPAREN, "(");
+    n->newChild(parse_variable_assignment());
+    expecting_reserved_word(T_SEMICOLON, ";");
+    n->newChild(parse_expression());
+    n->newChild(parse_if_statement_block());
+    expecting_reserved_word(T_RPAREN, ")");
+
+    n->newChild(parse_for_loop_statement_block());
+
+    n->newChild(expecting_reserved_word(T_END, "end"));
+    n->newChild(expecting_reserved_word(T_FOR, "for"));
+
+    return n;
+}
+node* parser::parse_for_loop_statement_block(){
+    node* n = new node(T_FOR_LOOP_STATEMENT_BLOCK);
+
+    while (current.type != T_END && current.type != T_ELSE && current.type != T_END_OF_FILE){
+        std::list<std::function<bool()>> functionList;
+
+        functionList.emplace_back([this, n] { return process_block_comments(n); });
+        functionList.emplace_back([this, n] { return process_variable_assignment(n); });
+        functionList.emplace_back([this, n] { return process_return_block(n); });
+        functionList.emplace_back([this, n] { return process_if_block(n); });
+        functionList.emplace_back([this, n] { return process_for_block(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -220,106 +262,104 @@ node* parser::parse_if_statement_block(){
 }
 
 /** Expressions **/
-// Arithmetic
-node* parser::parse_arith_op(node* n) {
+node* parser::parse_expression(node* n ){
 
     if (n == nullptr)
-        n = new node("", T_ARITH_OP);
+        n = new node(T_EXPRESSION);
 
-    if (current.type == T_LPAREN){
-        expecting_reserved_word(T_LPAREN, "(");
-        n->newChild(parse_arith_op());
-        expecting_reserved_word(T_RPAREN, ")");
-
-        n->newChild(parse_term_prime());
-        n->newChild(parse_arith_op_prime());
+    if (current.type == T_NOT){
+        n->newChild(expecting_reserved_word(T_NOT, "not"));
+        n->newChild(parse_relation());
     } else {
-        n->newChild(parse_term());
-        n->newChild(parse_arith_op_prime());
+        n->newChild(parse_relation());
+        if (current.type == T_AND || current.type == T_OR){
+            n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
+            parse_expression(n);
+        }
     }
 
-    if (n->children.empty())
-        return nullptr;
     return n;
 }
-node* parser::parse_term(node* n) {
+node* parser::parse_relation(node *n) {
+
+    if (n == nullptr)
+        n = new node(T_RELATION);
+
+    n->newChild(parse_arith());
+    if (is_current_relational_operator()){
+        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
+        parse_relation(n);
+    }
+    return n;
+}
+node* parser::parse_arith(node* n){
+
+    if (n == nullptr)
+        n = new node(T_ARITH_OP);
+
+    n->newChild(parse_term());
+    if (current.type == T_ADD || current.type == T_MINUS){
+        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
+        parse_arith(n);
+    }
+    return n;
+}
+node* parser::parse_term(node* n){
 
     if (n == nullptr)
         n = new node(T_TERM);
 
-    if (current.type == T_LPAREN){
-
-        expecting_reserved_word(T_LPAREN, "(");
-        n->newChild(parse_arith_op());
-        expecting_reserved_word(T_RPAREN, ")");
-
-        n->newChild(parse_term_prime());
-        n->newChild(parse_arith_op_prime());
-    } else {
-        n->newChild(parse_factor());
-        n->newChild(parse_term_prime());
-    }
-
-    if (n->children.empty())
-        return nullptr;
-    return n;
-}
-node* parser::parse_arith_op_prime() {
-
-    node* n = new node(T_ARITH_OP_PRIME);
-
-    if (current.type == T_ADD || current.type == T_MINUS){
-        node* symbol = node::create_identifier_literal_node(current.val.stringValue, current.type);
-        consume_token();
-        n->newChild(symbol);
-
-        n->newChild(parse_arith_op());
-    }
-
-    if( n->children.empty())
-        return nullptr;
-    return n;
-}
-node* parser::parse_term_prime() {
-
-    node* n = new node(T_TERM_PRIME);
+    n->newChild(parse_factor());
     if (current.type == T_MULTIPLY || current.type == T_DIVIDE){
-
-        node* symbol = node::create_identifier_literal_node(current.val.stringValue, current.type);
-        consume_token();
-        n->newChild(symbol);
-
+        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
         parse_term(n);
     }
-
-    if (n->children.empty())
-        return nullptr;
     return n;
 }
-node* parser::parse_factor() {
+node* parser::parse_factor(){
 
     node* n = new node(T_FACTOR);
+    bool isNegative = false;
+    bool isProcedure = false;
+
+    if (current.type == T_LPAREN){
+        expecting_reserved_word(T_LPAREN,"(");
+        n->newChild(parse_expression());
+        expecting_reserved_word(T_RPAREN,")");
+
+        return n;
+    }
+
+    if (current.type == T_MINUS){
+        n->newChild(expecting_reserved_word(T_MINUS, "-"));
+        isNegative = true;
+    }
+
+    if (current.type == T_STRING_LITERAL || current.type == T_FALSE || current.type == T_TRUE){
+        if (!isNegative){
+            n->newChild(expecting_literal(current.type));
+        } else {
+            throw_unexpected_token("variable or number", current.val.stringValue);
+        }
+        return n;
+    }
+
+    if (current.type == T_IDENTIFIER){
+        if ((!isNegative && isProcedure) || (!isProcedure)){
+            n->newChild(expecting_identifier());
+        } else {
+            throw_unexpected_token("variable", "procedure");
+        }
+        return n;
+    }
 
     if (current.type == T_INTEGER_LITERAL || current.type == T_FLOAT_LITERAL){
         n->newChild(expecting_literal(current.type));
-    } else if (current.type == T_IDENTIFIER){
-        n->newChild(expecting_identifier());
+        return n;
     }
 
-    if (n->children.empty())
-        return nullptr;
-    return n;
-}
-// Logic
-node* parser::parse_logical_op() {
-    node* n = new node(T_LOGICAL_OP);
-
-    n->newChild(get_value_node());
-    if (is_current_relational_operator()){
-        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-        n->newChild(get_value_node());
-    }
-    return n;
+    throw_runtime_template("Never got valid factor");
+    return nullptr;
 }
 
 /** Variables **/
@@ -350,9 +390,8 @@ node* parser::parse_variable_assignment() {
     }
     // Can stuff like this be stripped yet -- kinda like semi colons
     n->newChild(expecting_reserved_word(T_COLON_EQUALS, ":="));
-    n->newChild(get_value_node());
+    n->newChild(parse_expression());
 
-    expecting_reserved_word(T_SEMICOLON, ";");
     return n;
 }
 
@@ -375,27 +414,6 @@ node* parser::parse_block_comments() {
 }
 
 /** Helpers and Code Reuse **/
-node* parser::get_value_node() {
-    // TODO Check for identifiers of certain types
-    if (current.type == T_STRING_LITERAL || current.type == T_FALSE || current.type == T_FALSE){
-        return expecting_literal(current.type);
-    } else {
-        return parse_arith_op();
-    }
-}
-node* parser::get_boolean_node(){
-    if (current.type == T_FALSE){
-        node* n = new node("false", T_FALSE);
-        consume_token();
-        return n;
-    } else if (current.type == T_TRUE){
-        node* n = new node("true", T_TRUE);
-        consume_token();
-        return n;
-    } else {
-        return parse_arith_op();
-    }
-}
 void parser::run_processes_until_true(node* n, std::list<std::function<bool()>> ll) {
     while (!ll.empty()){
         if (ll.front()()){
@@ -484,6 +502,7 @@ bool parser::process_variable_assignment(node* n) {
     if (current.type == T_IDENTIFIER){
         // TODO -  This is not gonna work lol
         n->newChild(parse_variable_assignment());
+        expecting_reserved_word(T_SEMICOLON, ";");
         return true;
     }
     return false;
@@ -498,6 +517,13 @@ bool parser::process_procedure_declaration(node* n) {
 bool parser::process_if_block(node* n) {
     if (current.type == T_IF){
         n->newChild(parse_if_block());
+        return true;
+    }
+    return false;
+}
+bool parser::process_for_block(node* n) {
+    if (current.type == T_FOR){
+        n->newChild(parse_for_loop());
         return true;
     }
     return false;
