@@ -42,8 +42,8 @@ private:
 
     /** Expressions **/
     node* parse_expression(node* n = nullptr);
-    node* parse_relation(node* n = nullptr);
     node* parse_arith(node* n = nullptr);
+    node* parse_relation(node* n = nullptr);
     node* parse_term(node* n = nullptr);
     node* parse_factor();
 

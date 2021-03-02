@@ -269,9 +269,9 @@ node* parser::parse_expression(node* n ){
 
     if (current.type == T_NOT){
         n->newChild(expecting_reserved_word(T_NOT, "not"));
-        n->newChild(parse_relation());
+        n->newChild(parse_arith());
     } else {
-        n->newChild(parse_relation());
+        n->newChild(parse_arith());
         if (current.type == T_AND || current.type == T_OR){
             n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
             parse_expression(n);
@@ -280,27 +280,27 @@ node* parser::parse_expression(node* n ){
 
     return n;
 }
-node* parser::parse_relation(node *n) {
-
-    if (n == nullptr)
-        n = new node(T_RELATION);
-
-    n->newChild(parse_arith());
-    if (is_current_relational_operator()){
-        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-        parse_relation(n);
-    }
-    return n;
-}
 node* parser::parse_arith(node* n){
 
     if (n == nullptr)
         n = new node(T_ARITH_OP);
 
-    n->newChild(parse_term());
+    n->newChild(parse_relation());
     if (current.type == T_ADD || current.type == T_MINUS){
         n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
         parse_arith(n);
+    }
+    return n;
+}
+node* parser::parse_relation(node *n) {
+
+    if (n == nullptr)
+        n = new node(T_RELATION);
+
+    n->newChild(parse_term());
+    if (is_current_relational_operator()){
+        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
+        parse_relation(n);
     }
     return n;
 }
