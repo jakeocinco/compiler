@@ -61,6 +61,8 @@
 // -- SYMBOLS
 #define T_LPAREN '('    // ascii value - 40
 #define T_RPAREN ')'    // ascii value - 41
+#define T_LBRACE '{'    // ascii value - 123
+#define T_RBRACE '}'    // ascii value - 125
 #define T_LBRACKET '['  // ascii value - 91
 #define T_RBRACKET ']'  // ascii value - 93
 #define T_COMMA ','     // ascii value - 44
@@ -102,11 +104,13 @@
 #define T_TERM 312
 #define T_RELATION 313
 #define T_FACTOR 315
-#define T_LOGICAL_OP 316
-#define T_LOGICAL_OP_STATEMENT_BLOCK 316
 
 #define T_VARIABLE_DECLARATION 320
 #define T_VARIABLE_ASSIGNMENT 321
+
+#define T_TYPE_DECLARATION 325
+#define T_TYPE_DEF 326
+#define T_TYPE_MARK 326
 
 #define T_PROCEDURE_DECLARATION 330
 #define T_PARAMETER_LIST 331

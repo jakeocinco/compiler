@@ -60,6 +60,7 @@ node* parser::parse_program_declaration_block() {
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_declaration(n); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
+        functionList.emplace_back([this, n] { return process_type_declaration(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -93,10 +94,12 @@ node* parser::parse_procedure() {
 
     node* n = new node(T_PROCEDURE_DECLARATION);
 
+    if (current.type == T_GLOBAL)
+        n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_COLON, ":"));
-    n->newChild(expecting_type());
+    n->newChild(parse_type_mark());
 
     n->newChild(parse_procedure_parameter_list());
 
@@ -121,6 +124,7 @@ node* parser::parse_procedure_declaration_block() {
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_declaration(n); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
+        functionList.emplace_back([this, n] { return process_type_declaration(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -203,7 +207,7 @@ node* parser::parse_if_block() {
     return n;
 }
 node* parser::parse_if_statement_block(){
-    node* n = new node(T_LOGICAL_OP_STATEMENT_BLOCK);
+    node* n = new node(T_IF_STATEMENT_BLOCK);
 
     while (current.type != T_END && current.type != T_ELSE && current.type != T_END_OF_FILE){
         std::list<std::function<bool()>> functionList;
@@ -367,10 +371,12 @@ node* parser::parse_variable_declaration() {
     /** TODO: ADD TO TABLE **/
     node* n = new node(T_VARIABLE_DECLARATION);
 
+    if (current.type == T_GLOBAL)
+        n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
     n->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_COLON, ":"));
-    n->newChild(expecting_type());
+    n->newChild(parse_type_mark());
     if (current.type == T_LBRACKET){
         n->newChild(expecting_reserved_word(T_LBRACKET, "["));
         n->newChild(expecting_literal(T_INTEGER_LITERAL));
@@ -391,6 +397,55 @@ node* parser::parse_variable_assignment() {
     // Can stuff like this be stripped yet -- kinda like semi colons
     n->newChild(expecting_reserved_word(T_COLON_EQUALS, ":="));
     n->newChild(parse_expression());
+
+    return n;
+}
+
+/** Types **/
+node* parser::parse_type_declaration(){
+
+    node* n = new node(T_TYPE_DECLARATION);
+
+    if (current.type == T_GLOBAL)
+        n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
+    n->newChild(expecting_reserved_word(T_TYPE, "type"));
+    n->newChild(expecting_identifier());
+    n->newChild(expecting_reserved_word(T_IS, "is"));
+    n->newChild(parse_type_def());
+
+    return n;
+}
+node* parser::parse_type_def(){
+
+    node* n = new node(T_TYPE_DEF);
+
+    if (current.type == T_ENUM_TYPE){
+        n->newChild(expecting_reserved_word(T_ENUM_TYPE, "enum"));
+        expecting_reserved_word(T_LBRACE, "{");
+        n->newChild(expecting_identifier());
+        while (current.type == T_COMMA){
+            expecting_reserved_word(T_COMMA, ",");
+            n->newChild(expecting_identifier());
+        }
+        expecting_reserved_word(T_RBRACE, "}");
+    } else {
+        n->newChild(parse_type_mark());
+    }
+
+    expecting_reserved_word(T_SEMICOLON, ";");
+
+    return n;
+}
+node* parser::parse_type_mark(){
+
+    node* n = new node(T_TYPE_DEF);
+
+    if (current.type == T_IDENTIFIER){
+        // TODO - check to make sure type exists
+        n->newChild(expecting_identifier());
+    } else {
+        n->newChild(expecting_predefined_type());
+    }
 
     return n;
 }
@@ -421,7 +476,7 @@ void parser::run_processes_until_true(node* n, std::list<std::function<bool()>> 
         }
         ll.pop_front();
     }
-    throw runtime_error("No valid processes were found.");
+    throw_runtime_template("No valid processes were found.");
 }
 bool parser::is_current_relational_operator() const {
     return current.type >= T_L_THAN && current.type <= T_N_EQUALS;
@@ -445,7 +500,7 @@ node*  parser::expecting_identifier() {
     throw_unexpected_reserved_word(current.val.stringValue);
     return nullptr;
 }
-node*  parser::expecting_type() {
+node*  parser::expecting_predefined_type() {
     if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
             current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
         node* n = new node(current.val.stringValue, current.type);
@@ -490,8 +545,7 @@ bool parser::process_block_comments(node* n) {
     return false;
 }
 bool parser::process_variable_declaration(node* n) {
-    if (current.type == T_VARIABLE){
-
+    if (current.type == T_VARIABLE || (current.type == T_GLOBAL && next.type == T_VARIABLE)){
         n->newChild(parse_variable_declaration());
         expecting_reserved_word(T_SEMICOLON, ";");
         return true;
@@ -508,7 +562,7 @@ bool parser::process_variable_assignment(node* n) {
     return false;
 }
 bool parser::process_procedure_declaration(node* n) {
-    if(current.type == T_PROCEDURE){
+    if (current.type == T_PROCEDURE || (current.type == T_GLOBAL && next.type == T_PROCEDURE)){
         n->newChild(parse_procedure());
         return true;
     }
@@ -531,6 +585,13 @@ bool parser::process_for_block(node* n) {
 bool parser::process_return_block(node* n) {
     if (current.type == T_RETURN){
         n->newChild(parse_procedure_return_statement());
+        return true;
+    }
+    return false;
+}
+bool parser::process_type_declaration(node* n) {
+    if (current.type == T_TYPE || (current.type == T_GLOBAL && next.type == T_TYPE)){
+        n->newChild(parse_type_declaration());
         return true;
     }
     return false;

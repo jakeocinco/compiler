@@ -51,16 +51,21 @@ private:
     node* parse_variable_declaration();
     node* parse_variable_assignment();
 
+    /** Types **/
+    node* parse_type_declaration();
+    node* parse_type_def();
+    node* parse_type_mark();
+
     /** Block Comments **/
     node* parse_block_comments();
 
     /** Helpers and Code Reuse **/
-    static void run_processes_until_true(node* n, std::list<std::function<bool()>> ll);
+    void run_processes_until_true(node* n, std::list<std::function<bool()>> ll);
     bool is_current_relational_operator() const;
 
     node* expecting_reserved_word(int expected_type, const string& expected_value);
     node* expecting_identifier();
-    node* expecting_type();
+    node* expecting_predefined_type();
     node* expecting_literal(int expected_type = -1);
 
     /** Processors **/
@@ -71,6 +76,7 @@ private:
     bool process_if_block(node* n);
     bool process_for_block(node* n);
     bool process_return_block(node* n);
+    bool process_type_declaration(node* n);
 
     /** Error Handling **/
     void throw_runtime_template(const string& message) const;

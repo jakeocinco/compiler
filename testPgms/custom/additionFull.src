@@ -1,7 +1,8 @@
 program test_program is
-    variable a : integer;
+    global variable a : integer;
+    global type DOG is enum { CASEY, DAKOTA };
 //    variable x : float;
-    procedure getName : string(variable x : string, variable x : integer)
+    global procedure getName : string(variable x : string, variable x : integer)
         variable name : string;
         begin
             return "Jake";

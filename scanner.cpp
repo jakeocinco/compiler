@@ -102,6 +102,8 @@ std::map<string, int> scanner::get_reserved_words() {
     // SYMBOLS
     r.insert_or_assign("(",T_LPAREN);
     r.insert_or_assign(")",T_RPAREN);
+    r.insert_or_assign("{",T_LBRACE);
+    r.insert_or_assign("}",T_RBRACE);
     r.insert_or_assign("[",T_LBRACKET);
     r.insert_or_assign("]",T_RBRACKET);
     r.insert_or_assign(",",T_COMMA);
