@@ -15,4 +15,4 @@ begin
     end if
     a := 9;
     b := "jake"; // hello
-end program .
+end program

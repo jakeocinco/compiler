@@ -46,7 +46,6 @@ node* parser::parse_program() {
 
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_PROGRAM, "program"));
-    n->newChild(expecting_reserved_word(T_PERIOD, "."));
 
     return n;
 }
@@ -96,6 +95,7 @@ node* parser::parse_procedure() {
 
     if (current.type == T_GLOBAL)
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
+
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_COLON, ":"));
@@ -373,6 +373,7 @@ node* parser::parse_variable_declaration() {
 
     if (current.type == T_GLOBAL)
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
+
     n->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_COLON, ":"));
@@ -408,6 +409,7 @@ node* parser::parse_type_declaration(){
 
     if (current.type == T_GLOBAL)
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
+
     n->newChild(expecting_reserved_word(T_TYPE, "type"));
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_IS, "is"));
