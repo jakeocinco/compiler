@@ -100,13 +100,16 @@ node* parser::parse_procedure() {
 
     // TODO
     const string proc_name = current.val.stringValue;
-    push_new_identifier_to_symbol_table(proc_name, n->type);
-    push_current_symbol_table();
-    push_new_identifier_to_symbol_table(proc_name, n->type);
     n->newChild(expecting_identifier());
 
     n->newChild(expecting_reserved_word(T_COLON, ":"));
+
+    const unsigned type_val = current.type;
     n->newChild(parse_type_mark());
+
+    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
+    push_current_symbol_table();
+    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
 
     n->newChild(parse_procedure_parameter_list());
 
@@ -189,7 +192,9 @@ node* parser::parse_procedure_return_statement(){
     node* n = new node(T_RETURN_BLOCK);
 
     n->newChild(expecting_reserved_word(T_RETURN, "return"));
-    n->newChild(parse_expression());
+    unsigned variable_val = 0;
+    n->newChild(parse_expression(variable_val));
+    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     expecting_reserved_word(T_SEMICOLON, ";");
 
     return n;
@@ -207,7 +212,9 @@ node* parser::parse_procedure_call() {
         } else {
             expecting_reserved_word(T_COMMA, ",");
         }
-        n->newChild(parse_expression());
+        unsigned variable_val = 0;
+        n->newChild(parse_expression(variable_val));
+        std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     }
 
     expecting_reserved_word(T_RPAREN, ")");
@@ -216,13 +223,16 @@ node* parser::parse_procedure_call() {
         return nullptr;
     return n;
 }
+
 /** Built in Functionality **/
 node* parser::parse_if_block() {
     node* n = new node(T_IF_BLOCK);
 
     n->newChild(expecting_reserved_word(T_IF, "if"));
     expecting_reserved_word(T_LPAREN, "(");
-    n->newChild(parse_expression());
+    unsigned variable_val = 0;
+    n->newChild(parse_expression(variable_val));
+    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     expecting_reserved_word(T_RPAREN, ")");
     n->newChild(expecting_reserved_word(T_THEN, "then"));
     n->newChild(parse_if_statement_block());
@@ -265,7 +275,10 @@ node* parser::parse_for_loop() {
     expecting_reserved_word(T_LPAREN, "(");
     n->newChild(parse_variable_assignment());
     expecting_reserved_word(T_SEMICOLON, ";");
-    n->newChild(parse_expression());
+
+    unsigned variable_val = 0;
+    n->newChild(parse_expression(variable_val));
+    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     expecting_reserved_word(T_RPAREN, ")");
 
     n->newChild(parse_for_loop_statement_block());
@@ -296,69 +309,94 @@ node* parser::parse_for_loop_statement_block(){
 }
 
 /** Expressions **/
-node* parser::parse_expression(node* n ){
+node* parser::parse_expression(unsigned& code, node* n ){
 
     if (n == nullptr)
         n = new node(T_EXPRESSION);
 
     if (current.type == T_NOT){
         n->newChild(expecting_reserved_word(T_NOT, "not"));
-        n->newChild(parse_arith());
+        n->newChild(parse_arith(code));
+        code = T_RELATION;
     } else {
-        n->newChild(parse_arith());
+        n->newChild(parse_arith(code));
         if (current.type == T_AND || current.type == T_OR){
             n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-            parse_expression(n);
+            parse_expression(code, n);
+            code = T_RELATION;
         }
     }
 
     return n;
 }
-node* parser::parse_arith(node* n){
+node* parser::parse_arith(unsigned& code, node* n){
 
     if (n == nullptr)
         n = new node(T_ARITH_OP);
 
-    n->newChild(parse_relation());
+    unsigned c1 = 0;
+    n->newChild(parse_relation(c1));
     if (current.type == T_ADD || current.type == T_MINUS){
         n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-        parse_arith(n);
+        unsigned c2 = 0;
+        parse_arith(c2, n);
+        if (!are_types_valid_to_combine(code, c1, c2)){
+            throw_runtime_template("Invalid types: " + std::to_string(c1) + " and " + std::to_string(c2) + ".");
+        }
+    } else {
+        code = c1;
     }
     return n;
 }
-node* parser::parse_relation(node *n) {
+node* parser::parse_relation(unsigned& code, node *n) {
 
     if (n == nullptr)
         n = new node(T_RELATION);
 
-    n->newChild(parse_term());
+    unsigned c1 = 0;
+    n->newChild(parse_term(c1));
     if (is_current_relational_operator()){
         n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-        parse_relation(n);
+        unsigned c2 = 0;
+        parse_relation(c2, n);
+        if (!are_types_valid_to_combine(code, c1, c2)){
+            throw_runtime_template("Invalid types: " + std::to_string(c1) + " and " + std::to_string(c2) + ".");
+        } else {
+            code = T_RELATION;
+        }
+    } else {
+        code = c1;
     }
     return n;
 }
-node* parser::parse_term(node* n){
+node* parser::parse_term(unsigned& code, node* n){
 
     if (n == nullptr)
         n = new node(T_TERM);
 
-    n->newChild(parse_factor());
+    unsigned c1 = 0;
+    n->newChild(parse_factor(c1));
     if (current.type == T_MULTIPLY || current.type == T_DIVIDE){
         n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-        parse_term(n);
+
+        unsigned c2 = 0;
+        parse_term(c2, n);
+        if (!are_types_valid_to_combine(code, c1, c2)){
+            throw_runtime_template("Invalid types: " + std::to_string(c1) + " and " + std::to_string(c2) + ".");
+        }
+    } else {
+        code = c1;
     }
     return n;
 }
-node* parser::parse_factor(){
+node* parser::parse_factor(unsigned& code){
 
     node* n = new node(T_FACTOR);
     bool isNegative = false;
-    bool isProcedure = false;
 
     if (current.type == T_LPAREN){
         expecting_reserved_word(T_LPAREN,"(");
-        n->newChild(parse_expression());
+        n->newChild(parse_expression(code));
         expecting_reserved_word(T_RPAREN,")");
 
         return n;
@@ -370,6 +408,7 @@ node* parser::parse_factor(){
     }
 
     if (current.type == T_STRING_LITERAL || current.type == T_FALSE || current.type == T_TRUE){
+        code = current.type;
         if (!isNegative){
             n->newChild(expecting_literal(current.type));
         } else {
@@ -379,6 +418,7 @@ node* parser::parse_factor(){
     }
 
     if (current.type == T_IDENTIFIER){
+        code = verify_identifier_is_declared(current.val.stringValue);
         if (next.type == T_LPAREN && !isNegative){
             n->newChild(parse_procedure_call());
         } else {
@@ -388,6 +428,7 @@ node* parser::parse_factor(){
     }
 
     if (current.type == T_INTEGER_LITERAL || current.type == T_FLOAT_LITERAL){
+        code = current.type;
         n->newChild(expecting_literal(current.type));
         return n;
     }
@@ -405,10 +446,13 @@ node* parser::parse_variable_declaration() {
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
 
     n->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
-    push_new_identifier_to_symbol_table(current.val.stringValue, n->type);
+    const string identifier_name = current.val.stringValue;
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_COLON, ":"));
+    const unsigned type_val = current.type;
     n->newChild(parse_type_mark());
+
+    push_new_identifier_to_symbol_table(identifier_name, type_to_literal(type_val));
     if (current.type == T_LBRACKET){
         n->newChild(expecting_reserved_word(T_LBRACKET, "["));
         n->newChild(expecting_literal(T_INTEGER_LITERAL));
@@ -431,7 +475,9 @@ node* parser::parse_variable_assignment() {
     }
     // Can stuff like this be stripped yet -- kinda like semi colons
     n->newChild(expecting_reserved_word(T_COLON_EQUALS, ":="));
-    n->newChild(parse_expression());
+    unsigned variable_val = 0;
+    n->newChild(parse_expression(variable_val));
+    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
 
     return n;
 }
@@ -481,6 +527,34 @@ void parser::run_processes_until_true(node* n, std::list<std::function<bool()>> 
 }
 bool parser::is_current_relational_operator() const {
     return current.type >= T_L_THAN && current.type <= T_N_EQUALS;
+}
+bool parser::are_types_valid_to_combine(unsigned& code, unsigned c1, unsigned c2, bool first_run)  const {
+    if (c1 == c2){
+        code = c1;
+        return true;
+    } else if ((c1 == T_INTEGER_LITERAL && c2 == T_TRUE) ||
+            (c1 == T_INTEGER_LITERAL && c2 == T_FALSE)){
+        code = T_INTEGER_LITERAL;
+        return true;
+    } else if(c1 == T_INTEGER_LITERAL && c2 == T_FLOAT_LITERAL){
+        code = T_FLOAT_LITERAL;
+        return true;
+    } else if (first_run){
+        return are_types_valid_to_combine(code, c2, c1, false);
+    }
+    return false;
+}
+unsigned parser::type_to_literal(unsigned type){
+    if (type == T_INTEGER_TYPE){
+        return T_INTEGER_LITERAL;
+    } else if (type == T_FLOAT_TYPE){
+        return T_FLOAT_LITERAL;
+    } else if (type == T_STRING_TYPE){
+        return T_STRING_LITERAL;
+    } else if (type == T_BOOL_TYPE){
+        return T_TRUE;
+    }
+    return 0;
 }
 
 node*  parser::expecting_reserved_word(int expected_type, const string& expected_value) {
@@ -616,10 +690,12 @@ void parser::throw_unexpected_reserved_word(const string& received_token, const 
 void parser::push_new_identifier_to_symbol_table(string identifier, int n) {
     current_table->add_symbol(identifier, n);
 }
-void parser::verify_identifier_is_declared(string identifier) {
-    if (!current_table->check_symbol_status(identifier)){
-        throw_runtime_template("Variable " + identifier + " is not declared in the current scope.");
+unsigned parser::verify_identifier_is_declared(string identifier) {
+    if (current_table->check_symbol_status(identifier)){
+        return current_table->get_symbol_value(identifier);
     }
+    throw_runtime_template("Variable " + identifier + " is not declared in the current scope.");
+    return 0;
 }
 void parser::push_current_symbol_table() {
     current_table = new symbol_table(current_table);
@@ -627,7 +703,6 @@ void parser::push_current_symbol_table() {
 void parser::pop_current_symbol_table() {
     current_table = current_table->getParent();
 }
-
 
 /** VISUALIZERS **/
 void parser::print_nodes(node *n, unsigned depth) {

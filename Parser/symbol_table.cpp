@@ -18,6 +18,12 @@ bool symbol_table::check_symbol_status(std::string identifier) {
     }
     return false;
 }
+unsigned symbol_table::get_symbol_value(std::string identifier) {
+    if (this->table.contains(identifier)){
+        return this->table.find(identifier)->second;
+    }
+    return 0;
+}
 
 symbol_table *symbol_table::getParent() const {
     return parent;

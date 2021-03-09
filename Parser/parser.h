@@ -44,11 +44,11 @@ private:
     node* parse_for_loop_statement_block();
 
     /** Expressions **/
-    node* parse_expression(node* n = nullptr);
-    node* parse_arith(node* n = nullptr);
-    node* parse_relation(node* n = nullptr);
-    node* parse_term(node* n = nullptr);
-    node* parse_factor();
+    node* parse_expression(unsigned& code, node* n = nullptr);
+    node* parse_arith(unsigned& code, node* n = nullptr);
+    node* parse_relation(unsigned& code, node* n = nullptr);
+    node* parse_term(unsigned& code, node* n = nullptr);
+    node* parse_factor(unsigned& code);
 
     /** Variables **/
     node* parse_variable_declaration();
@@ -63,6 +63,8 @@ private:
     /** Helpers and Code Reuse **/
     void run_processes_until_true(node* n, std::list<std::function<bool()>> ll);
     bool is_current_relational_operator() const;
+    bool are_types_valid_to_combine(unsigned& code, unsigned c1, unsigned c2, bool first_run = true) const;
+    unsigned type_to_literal(unsigned type);
 
     node* expecting_reserved_word(int expected_type, const string& expected_value);
     node* expecting_identifier();
@@ -87,7 +89,7 @@ private:
 
     /** Symbol Table **/
     void push_new_identifier_to_symbol_table(string identifier, int n);
-    void verify_identifier_is_declared(string identifier);
+    unsigned verify_identifier_is_declared(string identifier);
     void push_current_symbol_table();
     void pop_current_symbol_table();
 
