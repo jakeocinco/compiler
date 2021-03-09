@@ -3,7 +3,7 @@
 //
 
 #include "parser.h"
-#include "tokenCodes.h"
+#include "../tokenCodes.h"
 
 #include <iostream>
 #include <regex>
@@ -14,8 +14,8 @@ using namespace std::placeholders;
 parser::parser(string file_text) {
 
     scan = new scanner(file_text + ' ');
+    current_table = new symbol_table();
 
-    std::list<scanner::_token> tokens;
     current = scan->get_next_token();
     next = scan->get_next_token();
 
@@ -41,7 +41,8 @@ node* parser::parse_program() {
     n->newChild(parse_program_declaration_block());
 
     n->newChild(expecting_reserved_word(T_BEGIN, "begin"));
-
+    std::cout << "\nPROGRAM LEVEL" << endl;
+    this->current_table->print(true);
     n->newChild(parse_program_statement_block());
 
     n->newChild(expecting_reserved_word(T_END, "end"));
@@ -59,7 +60,6 @@ node* parser::parse_program_declaration_block() {
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_declaration(n); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
-        functionList.emplace_back([this, n] { return process_type_declaration(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -97,7 +97,14 @@ node* parser::parse_procedure() {
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
 
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
+
+    // TODO
+    const string proc_name = current.val.stringValue;
+    push_new_identifier_to_symbol_table(proc_name, n->type);
+    push_current_symbol_table();
+    push_new_identifier_to_symbol_table(proc_name, n->type);
     n->newChild(expecting_identifier());
+
     n->newChild(expecting_reserved_word(T_COLON, ":"));
     n->newChild(parse_type_mark());
 
@@ -111,7 +118,9 @@ node* parser::parse_procedure() {
 
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
-
+    std::cout << "\nPROCEDURE LEVEL | " << proc_name << "()" << endl;
+    this->current_table->print(true);
+    pop_current_symbol_table();
     return n;
 }
 node* parser::parse_procedure_declaration_block() {
@@ -124,7 +133,7 @@ node* parser::parse_procedure_declaration_block() {
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_declaration(n); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
-        functionList.emplace_back([this, n] { return process_type_declaration(n); });
+//        functionList.emplace_back([this, n] { return process_type_declaration(n); });
 
         run_processes_until_true(n, functionList);
     }
@@ -158,10 +167,11 @@ node* parser::parse_procedure_parameter_list(){
     bool isFirstRun = true;
     node* n = new node(T_PARAMETER_LIST);
 
+
+    expecting_reserved_word(T_LPAREN, "(");
     while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
         if (isFirstRun){
             isFirstRun = false;
-            expecting_reserved_word(T_LPAREN, "(");
         } else {
             expecting_reserved_word(T_COMMA, ",");
         }
@@ -184,7 +194,28 @@ node* parser::parse_procedure_return_statement(){
 
     return n;
 }
+node* parser::parse_procedure_call() {
+    bool isFirstRun = true;
+    node* n = new node(T_PROCEDURE_CALL);
 
+    verify_identifier_is_declared(current.val.stringValue);
+    n->newChild(expecting_identifier());
+    expecting_reserved_word(T_LPAREN, "(");
+    while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
+        if (isFirstRun){
+            isFirstRun = false;
+        } else {
+            expecting_reserved_word(T_COMMA, ",");
+        }
+        n->newChild(parse_expression());
+    }
+
+    expecting_reserved_word(T_RPAREN, ")");
+
+    if (n->children.empty())
+        return nullptr;
+    return n;
+}
 /** Built in Functionality **/
 node* parser::parse_if_block() {
     node* n = new node(T_IF_BLOCK);
@@ -235,7 +266,6 @@ node* parser::parse_for_loop() {
     n->newChild(parse_variable_assignment());
     expecting_reserved_word(T_SEMICOLON, ";");
     n->newChild(parse_expression());
-    n->newChild(parse_if_statement_block());
     expecting_reserved_word(T_RPAREN, ")");
 
     n->newChild(parse_for_loop_statement_block());
@@ -349,10 +379,10 @@ node* parser::parse_factor(){
     }
 
     if (current.type == T_IDENTIFIER){
-        if ((!isNegative && isProcedure) || (!isProcedure)){
-            n->newChild(expecting_identifier());
+        if (next.type == T_LPAREN && !isNegative){
+            n->newChild(parse_procedure_call());
         } else {
-            throw_unexpected_token("variable", "procedure");
+            n->newChild(expecting_identifier());
         }
         return n;
     }
@@ -375,6 +405,7 @@ node* parser::parse_variable_declaration() {
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
 
     n->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
+    push_new_identifier_to_symbol_table(current.val.stringValue, n->type);
     n->newChild(expecting_identifier());
     n->newChild(expecting_reserved_word(T_COLON, ":"));
     n->newChild(parse_type_mark());
@@ -383,11 +414,14 @@ node* parser::parse_variable_declaration() {
         n->newChild(expecting_literal(T_INTEGER_LITERAL));
         n->newChild(expecting_reserved_word(T_RBRACKET, "]"));
     }
+
+
     return n;
 }
 node* parser::parse_variable_assignment() {
     node* n = new node(T_VARIABLE_ASSIGNMENT);
-    /** TODO: Check scope **/
+
+    verify_identifier_is_declared(current.val.stringValue);
     n->newChild(expecting_identifier());
 
     if (T_LBRACKET == current.type){
@@ -403,41 +437,6 @@ node* parser::parse_variable_assignment() {
 }
 
 /** Types **/
-node* parser::parse_type_declaration(){
-
-    node* n = new node(T_TYPE_DECLARATION);
-
-    if (current.type == T_GLOBAL)
-        n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
-
-    n->newChild(expecting_reserved_word(T_TYPE, "type"));
-    n->newChild(expecting_identifier());
-    n->newChild(expecting_reserved_word(T_IS, "is"));
-    n->newChild(parse_type_def());
-
-    return n;
-}
-node* parser::parse_type_def(){
-
-    node* n = new node(T_TYPE_DEF);
-
-    if (current.type == T_ENUM_TYPE){
-        n->newChild(expecting_reserved_word(T_ENUM_TYPE, "enum"));
-        expecting_reserved_word(T_LBRACE, "{");
-        n->newChild(expecting_identifier());
-        while (current.type == T_COMMA){
-            expecting_reserved_word(T_COMMA, ",");
-            n->newChild(expecting_identifier());
-        }
-        expecting_reserved_word(T_RBRACE, "}");
-    } else {
-        n->newChild(parse_type_mark());
-    }
-
-    expecting_reserved_word(T_SEMICOLON, ";");
-
-    return n;
-}
 node* parser::parse_type_mark(){
 
     node* n = new node(T_TYPE_DEF);
@@ -591,13 +590,6 @@ bool parser::process_return_block(node* n) {
     }
     return false;
 }
-bool parser::process_type_declaration(node* n) {
-    if (current.type == T_TYPE || (current.type == T_GLOBAL && next.type == T_TYPE)){
-        n->newChild(parse_type_declaration());
-        return true;
-    }
-    return false;
-}
 
 /** Error Handling **/
 void parser::throw_runtime_template(const string& message) const {
@@ -620,34 +612,24 @@ void parser::throw_unexpected_reserved_word(const string& received_token, const 
             + received_token + "' instead." + extra_message);
 }
 
+/** Symbol Table **/
+void parser::push_new_identifier_to_symbol_table(string identifier, int n) {
+    current_table->add_symbol(identifier, n);
+}
+void parser::verify_identifier_is_declared(string identifier) {
+    if (!current_table->check_symbol_status(identifier)){
+        throw_runtime_template("Variable " + identifier + " is not declared in the current scope.");
+    }
+}
+void parser::push_current_symbol_table() {
+    current_table = new symbol_table(current_table);
+}
+void parser::pop_current_symbol_table() {
+    current_table = current_table->getParent();
+}
+
+
 /** VISUALIZERS **/
-void parser::printer_tokens() {
-    while(current.type != T_END_OF_FILE){
-        cout << current.type << " | ";
-        if (current.type == T_INTEGER_LITERAL)
-            cout << current.val.intValue << " | " ;
-        else if (current.type == T_FLOAT_LITERAL)
-            cout << current.val.doubleValue << " | " ;
-        else
-            cout << current.val.stringValue << " | ";
-        cout << current.line_number << endl;
-
-        consume_token();
-    }
-}
-std::list<scanner::_token> parser::get_tokens(std::string file_text) {
-    auto *s = new scanner(file_text + ' ');
-    std::list<scanner::_token> tokens;
-    scanner::_token tt = s->get_next_token();
-    while (tt.type != T_END_OF_FILE){
-        tokens.push_back(tt);
-
-        tt = s->get_next_token();
-
-    }
-
-    return tokens;
-}
 void parser::print_nodes(node *n, unsigned depth) {
     for (int i = 0; i <= depth; i++){
         std::cout << "---";
@@ -722,4 +704,5 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
         file_id->close();
     }
 }
+
 

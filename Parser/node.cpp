@@ -4,7 +4,7 @@
 
 #include <string>
 #include "node.h"
-#include "tokenCodes.h"
+#include "../tokenCodes.h"
 
 node::node(int type) {
     this->type = type;
@@ -34,7 +34,7 @@ node* node::create_integer_literal_node(int i) {
 
 node* node::create_double_literal_node(double i) {
     node* n = new node(T_FLOAT_LITERAL);
-    n->val.intValue = i;
+    n->val.doubleValue = i;
     return n;
 }
 

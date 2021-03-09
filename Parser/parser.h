@@ -6,7 +6,8 @@
 #define COMPILER_5183_PARSER_H
 
 #include "node.h"
-#include "scanner.h"
+#include "symbol_table.h"
+#include "../Scanner/scanner.h"
 #include <string>
 
 class parser {
@@ -19,6 +20,7 @@ private:
     scanner::_token next{};
 
     node* head;
+    symbol_table* current_table;
 
     void consume_token();
 
@@ -33,6 +35,7 @@ private:
     node* parse_procedure_statement_block();
     node* parse_procedure_parameter_list();
     node* parse_procedure_return_statement();
+    node* parse_procedure_call();
 
     /** Built in Functionality **/
     node* parse_if_block();
@@ -52,8 +55,6 @@ private:
     node* parse_variable_assignment();
 
     /** Types **/
-    node* parse_type_declaration();
-    node* parse_type_def();
     node* parse_type_mark();
 
     /** Block Comments **/
@@ -76,7 +77,6 @@ private:
     bool process_if_block(node* n);
     bool process_for_block(node* n);
     bool process_return_block(node* n);
-    bool process_type_declaration(node* n);
 
     /** Error Handling **/
     void throw_runtime_template(const string& message) const;
@@ -85,12 +85,16 @@ private:
     void throw_unexpected_token_wanted_literal(const string& received_token, const string& extra_message = "");
     void throw_unexpected_reserved_word(const string& received_token, const string& extra_message = "");
 
+    /** Symbol Table **/
+    void push_new_identifier_to_symbol_table(string identifier, int n);
+    void verify_identifier_is_declared(string identifier);
+    void push_current_symbol_table();
+    void pop_current_symbol_table();
+
     /** VISUALIZERS **/
-    void printer_tokens();
     void print_nodes(node* n, unsigned depth = 0);
     void print_node_leaves(node* n);
     void print_node_to_json(node* n, std::ofstream* file_id = nullptr);
-    std::list<scanner::_token> get_tokens(std::string file_text);
 };
 
 

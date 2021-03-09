@@ -1,18 +1,28 @@
 program test_program is
     global variable a : integer;
-    global type DOG is enum { CASEY, DAKOTA };
-//    variable x : float;
-    global procedure getName : string(variable x : string, variable x : integer)
+    variable x : float;
+	variable loopVal : integer;
+
+    procedure getName : string(variable firstName : string)
         variable name : string;
-        begin
-            return "Jake";
-        end procedure
+        procedure getLastName : string (variable firstName: string)
+              begin
+                    return "Carlson";
+              end procedure
+      begin
+            name := firstName + getLastName(firstName, "Carlson");
+            return name;
+      end procedure
 begin
+    x := 1;
+    for (loopVal := 0; loopVal <= 4)
+        x := x * 1.1;
+        loopVal := loopVal + 1;
+    end for
+
     if (1 > 0) then
         a := 2*((5)-3);
     else
         a := 10/5*9;
     end if
-    a := 9;
-    b := "jake"; // hello
 end program

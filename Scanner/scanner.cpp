@@ -5,7 +5,7 @@
 #include <list>
 #include <utility>
 #include "scanner.h"
-#include "tokenCodes.h"
+#include "../tokenCodes.h"
 
 #include <cstring>
 
