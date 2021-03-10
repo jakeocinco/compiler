@@ -16,7 +16,7 @@ public:
     symbol_table(symbol_table* parent = nullptr);
 
     void add_symbol(std::string identifier, int n);
-    bool check_symbol_status(std::string identifier);
+    bool check_symbol_status(const std::string& identifier);
     unsigned get_symbol_value(std::string identifier);
 
     symbol_table *getParent() const;

@@ -1,5 +1,5 @@
 program test_program is
-    global variable a : integer;
+    variable a : integer;
     variable x : float;
     variable y : float;
     variable name : string;
@@ -8,8 +8,9 @@ program test_program is
     procedure getName : string(variable firstName : string)
         variable name : string;
         procedure getLastName : string (variable firstName: string)
+              variable x : string;
               begin
-                    return "Carlson";
+                    return "Carlson" + x;
               end procedure
       begin
             name := firstName + getLastName(firstName, "Carlson");

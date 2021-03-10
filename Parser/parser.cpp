@@ -109,7 +109,7 @@ node* parser::parse_procedure() {
 
     push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
     push_current_symbol_table();
-    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
+//    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
 
     n->newChild(parse_procedure_parameter_list());
 
@@ -122,7 +122,8 @@ node* parser::parse_procedure() {
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
     std::cout << "\nPROCEDURE LEVEL | " << proc_name << "()" << endl;
-    this->current_table->print(true);
+    this->current_table->print();
+
     pop_current_symbol_table();
     return n;
 }

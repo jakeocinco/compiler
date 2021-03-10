@@ -12,16 +12,18 @@ symbol_table::symbol_table(symbol_table *parent) {
 void symbol_table::add_symbol(std::string identifier, int n) {
     this->table.insert_or_assign(identifier, n);
 }
-bool symbol_table::check_symbol_status(std::string identifier) {
-    if (this->table.contains(identifier)){
+bool symbol_table::check_symbol_status(const std::string& identifier) {
+    if (this->table.contains(identifier))
         return true;
-    }
+    if (this->parent != nullptr)
+        return this->parent->check_symbol_status(identifier);
     return false;
 }
 unsigned symbol_table::get_symbol_value(std::string identifier) {
-    if (this->table.contains(identifier)){
+    if (this->table.contains(identifier))
         return this->table.find(identifier)->second;
-    }
+    if (this->parent != nullptr)
+        return this->parent->get_symbol_value(identifier);
     return 0;
 }
 
