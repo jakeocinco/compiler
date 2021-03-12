@@ -132,7 +132,7 @@ std::map<string, int> scanner::get_reserved_words() {
 }
 
 bool scanner::is_delimiter(string s) {
-    std::list<string> l = { "&","|","*","/","+","-","(",")","[","]",",",":",";","=",">","<","!"};
+    std::list<string> l = { "&","|","*","/","+","-","(",")","[","]",",",":",";","=",">","<","!","."};
     return (std::find(std::begin(l), std::end(l), s) != std::end(l));
 }
 
@@ -163,6 +163,7 @@ string scanner::get_next_text() {
         if (is_delimiter(string(1,raw_text.at(cursor))) || is_white_space(string(1,raw_text.at(cursor)))){
             string s = trim(raw_text.substr(0,cursor), ws);
             string symbol = string(1, raw_text.at(cursor));
+            bool doNotReturn = false;
 
             // Special cases for symbols, split out to separate functions
             if (symbol == "/"){
@@ -218,14 +219,19 @@ string scanner::get_next_text() {
                     }
                 }
             }
+            if (symbol == "."){
+                if (0 < s.length() && isdigit(s[s.length() - 1])){
+                    doNotReturn = true;
+                }
+            }
 
             // THIS CAN BE BETTER - check only symbol probably
-            if (0 < s.length()){
+            if (0 < s.length() && !doNotReturn){
                 raw_text = raw_text.substr(cursor, raw_text.length());
                 cursor = 0;
                 return s;
             }
-            if (is_delimiter(symbol) || is_white_space(symbol)){
+            if ((is_delimiter(symbol) || is_white_space(symbol)) && !doNotReturn){
                 raw_text = raw_text.substr(cursor + 1, raw_text.length());
                 cursor = 0;
                 return symbol;

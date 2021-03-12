@@ -14,7 +14,7 @@ using namespace std::placeholders;
 parser::parser(string file_text) {
 
     scan = new scanner(file_text + ' ');
-    current_table = new symbol_table();
+    initialize_symbol_table();
 
     current = scan->get_next_token();
     next = scan->get_next_token();
@@ -109,7 +109,8 @@ node* parser::parse_procedure() {
 
     push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
     push_current_symbol_table();
-//    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
+    // this one still gets me
+    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
 
     n->newChild(parse_procedure_parameter_list());
 
@@ -121,6 +122,7 @@ node* parser::parse_procedure() {
 
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
+    expecting_reserved_word(T_SEMICOLON, ";");
     std::cout << "\nPROCEDURE LEVEL | " << proc_name << "()" << endl;
     this->current_table->print();
 
@@ -195,7 +197,6 @@ node* parser::parse_procedure_return_statement(){
     n->newChild(expecting_reserved_word(T_RETURN, "return"));
     unsigned variable_val = 0;
     n->newChild(parse_expression(variable_val));
-    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     expecting_reserved_word(T_SEMICOLON, ";");
 
     return n;
@@ -205,7 +206,13 @@ node* parser::parse_procedure_call() {
     node* n = new node(T_PROCEDURE_CALL);
 
     verify_identifier_is_declared(current.val.stringValue);
-    n->newChild(expecting_identifier());
+    if (current.type == T_IDENTIFIER || (current.type >= T_GET_BOOL && current.type <= T_PUT_STRING)){
+        n->newChild(new node(current.val.stringValue, current.type));
+        consume_token();
+    } else {
+        throw_runtime_template("Was expecting procedure.");
+    }
+
     expecting_reserved_word(T_LPAREN, "(");
     while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
         if (isFirstRun){
@@ -215,7 +222,6 @@ node* parser::parse_procedure_call() {
         }
         unsigned variable_val = 0;
         n->newChild(parse_expression(variable_val));
-        std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     }
 
     expecting_reserved_word(T_RPAREN, ")");
@@ -233,7 +239,6 @@ node* parser::parse_if_block() {
     expecting_reserved_word(T_LPAREN, "(");
     unsigned variable_val = 0;
     n->newChild(parse_expression(variable_val));
-    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     expecting_reserved_word(T_RPAREN, ")");
     n->newChild(expecting_reserved_word(T_THEN, "then"));
     n->newChild(parse_if_statement_block());
@@ -245,6 +250,7 @@ node* parser::parse_if_block() {
 
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_IF, "if"));
+    expecting_reserved_word(T_SEMICOLON, ";");
 
     return n;
 }
@@ -279,13 +285,13 @@ node* parser::parse_for_loop() {
 
     unsigned variable_val = 0;
     n->newChild(parse_expression(variable_val));
-    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
     expecting_reserved_word(T_RPAREN, ")");
 
     n->newChild(parse_for_loop_statement_block());
 
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_FOR, "for"));
+    expecting_reserved_word(T_SEMICOLON, ";");
 
     return n;
 }
@@ -420,14 +426,25 @@ node* parser::parse_factor(unsigned& code){
 
     if (current.type == T_IDENTIFIER){
         code = verify_identifier_is_declared(current.val.stringValue);
+
         if (next.type == T_LPAREN && !isNegative){
             n->newChild(parse_procedure_call());
         } else {
             n->newChild(expecting_identifier());
+            if (current.type == T_LBRACKET){
+                expecting_reserved_word(T_LBRACKET, "[");
+                n->newChild(expecting_literal(T_INTEGER_LITERAL));
+                expecting_reserved_word(T_RBRACKET, "]");
+            }
         }
         return n;
     }
 
+    if (current.type >= T_GET_BOOL && current.type <= T_PUT_STRING){
+        code = verify_identifier_is_declared(current.val.stringValue);
+        n->newChild(parse_procedure_call());
+        return n;
+    }
     if (current.type == T_INTEGER_LITERAL || current.type == T_FLOAT_LITERAL){
         code = current.type;
         n->newChild(expecting_literal(current.type));
@@ -478,7 +495,6 @@ node* parser::parse_variable_assignment() {
     n->newChild(expecting_reserved_word(T_COLON_EQUALS, ":="));
     unsigned variable_val = 0;
     n->newChild(parse_expression(variable_val));
-    std::cout << "Variable Val: " << variable_val << " | line: " << current.line_number << std::endl;
 
     return n;
 }
@@ -688,6 +704,17 @@ void parser::throw_unexpected_reserved_word(const string& received_token, const 
 }
 
 /** Symbol Table **/
+void parser::initialize_symbol_table() {
+    current_table = new symbol_table();
+    push_new_identifier_to_symbol_table("getbool", T_GET_BOOL);
+    push_new_identifier_to_symbol_table("getinteger", T_GET_INTEGER);
+    push_new_identifier_to_symbol_table("getfloat", T_GET_FLOAT);
+    push_new_identifier_to_symbol_table("getstring", T_GET_STRING);
+    push_new_identifier_to_symbol_table("putbool", T_PUT_BOOL);
+    push_new_identifier_to_symbol_table("putinteger", T_PUT_INTEGER);
+    push_new_identifier_to_symbol_table("putfloat", T_PUT_FLOAT);
+    push_new_identifier_to_symbol_table("putstring", T_PUT_STRING);
+}
 void parser::push_new_identifier_to_symbol_table(string identifier, int n) {
     current_table->add_symbol(identifier, n);
 }

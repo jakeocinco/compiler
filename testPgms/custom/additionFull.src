@@ -30,4 +30,4 @@ begin
     else
         a := 10/5*9;
     end if
-end program
+end program.

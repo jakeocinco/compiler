@@ -88,6 +88,7 @@ private:
     void throw_unexpected_reserved_word(const string& received_token, const string& extra_message = "");
 
     /** Symbol Table **/
+    void initialize_symbol_table();
     void push_new_identifier_to_symbol_table(string identifier, int n);
     unsigned verify_identifier_is_declared(string identifier);
     void push_current_symbol_table();
