@@ -13,6 +13,7 @@
 class parser {
 public:
     parser(std::string file_text);
+    node* get_head();
 private:
 
     scanner* scan;

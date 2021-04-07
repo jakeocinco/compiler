@@ -8,6 +8,11 @@
 
 using namespace std;
 
+//static LLVMContext TheContext;
+//static IRBuilder<> Builder(TheContext);
+//static std::unique_ptr<Module> TheModule;
+//static std::map<std::string, Value *> NamedValues;
+
 int main(int argc, char** argv) {
 
     if (argc > 1){

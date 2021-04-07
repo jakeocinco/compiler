@@ -23,6 +23,9 @@ parser::parser(string file_text) {
 
     print_node_to_json(head);
 }
+node* parser::get_head() {
+    return head;
+}
 
 void parser::consume_token() {
     current = next;
