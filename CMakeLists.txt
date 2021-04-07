@@ -21,11 +21,11 @@ add_definitions(${LLVM_DEFINITIONS})
 set(CMAKE_CXX_STANDARD 20)
 
 set(SOURCE_FILES Scanner/scanner.cpp compiler.cpp Parser/node.cpp Parser/parser.cpp Parser/symbol_table.cpp  CodeGeneration/code_generation.cpp )
-set(HEADER_FILES Scanner/scanner.h compiler.h Parser/node.h Parser/parser.h Parser/symbol_table.h CodeGeneration/code_generation.h CodeGeneration/ExprAst.h)
+set(HEADER_FILES Scanner/scanner.h compiler.h Parser/node.h Parser/parser.h Parser/symbol_table.h CodeGeneration/code_generation.h CodeGeneration/ExprAst.h GeneratorLLVM.cpp GeneratorLLVM.h)
 
 add_executable(Compiler_5183 main.cpp tokenCodes.h ${SOURCE_FILES} ${HEADER_FILES} )
 
 
-#set(llvm_libs support core irreader)
-llvm_map_components_to_libnames(llvm_libs support core irreader)
+#set(llvm_libs support core irreader target)
+llvm_map_components_to_libnames(llvm_libs irreader target core executionengine interpreter mc support nativecodegen)
 target_link_libraries(Compiler_5183 ${llvm_libs})

@@ -5,6 +5,7 @@
 
 #include "compiler.h"
 #include "Parser/parser.h"
+#include "CodeGeneration/code_generation.h"
 
 #include <iostream>
 #include <regex>
@@ -16,7 +17,8 @@ using namespace std;
 compiler::compiler(const string& file_name) {
 
     const string file_text = get_file_text_as_string(file_name);
-    new parser(file_text);
+    new code_generation(file_text);
+//    new parser(file_text);file_text
 }
 
 string compiler::get_file_text_as_string(const string& file_name) {

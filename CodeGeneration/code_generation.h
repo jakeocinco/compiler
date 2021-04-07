@@ -5,23 +5,42 @@
 #ifndef COMPILER_5183_CODE_GENERATION_H
 #define COMPILER_5183_CODE_GENERATION_H
 
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include "ExprAst.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 #include "../Parser/node.h"
+#include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <map>
+#include <memory>
 #include <string>
+#include <system_error>
+#include <utility>
 #include <vector>
 
 using namespace llvm;
+using namespace llvm::sys;
 
 static LLVMContext context;
 static IRBuilder<> builder(context);
@@ -33,13 +52,16 @@ public:
     code_generation(std::string file_text);
 private:
 
+    void write_to_file(Module* m);
+
     node* tree;
 
     Value* codegen(node* n);
 
-    Function* codegen_program_root(node* n);
+    Module* make_mod(node* n);
+    Module* codegen_program_root(node* n);
 
-    Function* codegen_function(node* n);
+    Function* codegen_function(node* n, Module* m);
     Value* codegen_function_body(node* n);
 
     Value* codegen_literal_integer(node* n);

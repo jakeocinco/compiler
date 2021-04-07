@@ -11,17 +11,17 @@ program test_program is
               variable x : string;
               begin
                     return "Carlson" + x;
-              end procedure
+              end procedure;
       begin
             name := firstName + getLastName(firstName, "Carlson");
             return name;
-      end procedure
+      end procedure;
 begin
     x := 1;
     for (loopVal := 0; loopVal <= 4)
         x := 1.1 * 2;
         loopVal := loopVal + 1;
-    end for
+    end for;
 
     y := x * 1.2;
     name := getName("Jake");
@@ -29,5 +29,5 @@ begin
         a := 2*((5)-3);
     else
         a := 10/5*9;
-    end if
+    end if;
 end program.
