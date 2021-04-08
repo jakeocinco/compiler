@@ -70,12 +70,13 @@ private:
     Value* codegen(node* n);
 
     Module* codegen_program_root(node* n);
-    void* codegen_statement_block(node* n);
+    void codegen_statement_block(node* n, IRBuilder<>* b);
 
     Function* codegen_function(node* n, Module* m);
     Value* codegen_function_body(node* n);
 
-    void* codegen_variable_assignment(node* n);
+    void codegen_variable_declaration(node* n, IRBuilder<>* b);
+    void codegen_variable_assignment(node* n, IRBuilder<>* b);
 
     Value* codegen_literal_integer(node* n);
     Value* codegen_literal_float(node* n);

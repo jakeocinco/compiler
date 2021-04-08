@@ -28,8 +28,8 @@ code_generation::code_generation(std::string file_text) {
 Value *code_generation::codegen(node* n) {
     if (n->type == T_INTEGER_LITERAL) return codegen_literal_integer(n);
     if (n->type == T_FLOAT_LITERAL) return codegen_literal_float(n);
-    if (n->type == T_MULTIPLY) return codegen_multiply(n);
-    if (n->type == T_EXPRESSION) return codegen_multiply(n);
+//    if (n->type == T_MULTIPLY) return codegen_multiply(n);
+//    if (n->type == T_EXPRESSION) return codegen_multiply(n);
     return nullptr;
 }
 
@@ -58,24 +58,25 @@ Module* code_generation::codegen_program_root(node *n) {
 
     if (Value* returnVal = codegen_function_body(nullptr)){
         //    codegen_statement_block(n->children.front());
-        node* t = node::create_integer_literal_node(5);
-        Value* v = codegen_literal_integer(t);
-        Value* temp = builder.CreateMul(v, v, "multemp");
-        builder.CreateAlloca(Type::getInt32Ty(context), temp, "a");
-        n->children.pop_front();
+//        node* t = node::create_integer_literal_node(5);
+//        Value* v = codegen_literal_integer(t);
+//        Value* temp = builder.CreateMul(v, v, "multemp");
+//        builder.CreateAlloca(Type::getInt32Ty(context), temp, "a");
+            codegen_statement_block(n->children.front(), &builder);
+//        n->children.pop_front();
         builder.CreateRet(returnVal);
 //        verifyFunction(*f);
     }
     return m;
 }
 
-void *code_generation::codegen_statement_block(node *n) {
+void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     for (node* x : n->children){
-        if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x);
+        if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
     }
 }
 
-void *code_generation::codegen_variable_assignment(node *n) {
+void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
     n->children.pop_front();
     n->children.pop_front();
@@ -146,9 +147,15 @@ Value *code_generation::codegen_arith_op(node *n,  Value* n2) {
 
     switch (operation) {
         case T_ADD:
-            return builder.CreateFAdd(lhs, rhs, "addtmp");
+            if (n->children.empty())
+                return builder.CreateFAdd(lhs, rhs, "addtmp");
+            else
+                return codegen_arith_op(n, builder.CreateFAdd(lhs, rhs, "addtmp"));
         case T_MINUS:
-            return builder.CreateFSub(lhs, rhs, "addtmp");
+            if (n->children.empty())
+                return builder.CreateFSub(lhs, rhs, "addtmp");
+            else
+                return codegen_arith_op(n, builder.CreateFSub(lhs, rhs, "addtmp"));
         default:
             cout << "Error" << endl;
     }
@@ -171,14 +178,22 @@ Value *code_generation::codegen_term(node *n, Value* n2) {
 
     int operation = n->children.front()->type;
     n->children.pop_front();
+
+
     Value* rhs = codegen_factor(n->children.front());
     n->children.pop_front();
 
     switch (operation) {
         case T_MULTIPLY:
-            return builder.CreateFMul(lhs, rhs, "multmp");
+            if (n->children.empty())
+                return builder.CreateFMul(lhs, rhs, "multmp");
+            else
+                return codegen_term(n, builder.CreateFMul(lhs, rhs, "multmp"));
         case T_DIVIDE:
-            return builder.CreateFDiv(lhs, rhs, "divtmp");
+            if (n->children.empty())
+                return builder.CreateFDiv(lhs, rhs, "divtmp");
+            else
+                return codegen_term(n, builder.CreateFDiv(lhs, rhs, "divtmp"));
         default:
             cout << "Error" << endl;
     }
@@ -190,8 +205,12 @@ Value *code_generation::codegen_factor(node *n) {
         return codegen_literal_integer(x);
     if (x->type == T_FLOAT_LITERAL)
         return codegen_literal_float(x);
+    if (x->type == T_IDENTIFIER)
+        return codegen_literal_integer(node::create_integer_literal_node(2));
     return nullptr;
 }
+
+
 
 
 //void code_generation::write_to_file(Module* m) {
