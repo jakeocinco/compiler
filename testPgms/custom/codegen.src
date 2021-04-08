@@ -1,0 +1,7 @@
+program LoopFib is
+    variable x : integer;
+    variable y : integer;
+begin
+    y := 2;
+    //x := 4 * 5 - 2 / y * 1 - 6 * 2 / 3;
+end program.

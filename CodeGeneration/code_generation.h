@@ -5,27 +5,38 @@
 #ifndef COMPILER_5183_CODE_GENERATION_H
 #define COMPILER_5183_CODE_GENERATION_H
 
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
+//#include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
+//#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
+//#include "llvm/IR/PassManager.h"
+//#include "llvm/IR/CallingConv.h"
+//#include "llvm/IR/Verifier.h"
+//#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/IRBuilder.h"
+//#include "llvm/IR/LegacyPassManager.h"
+//#include "llvm/Bitcode/BitcodeWriter.h"
+//#include "llvm/ADT/APFloat.h"
+//#include "llvm/ADT/Optional.h"
+//#include "llvm/ADT/STLExtras.h"
+//#include "llvm/IR/BasicBlock.h"
+//#include "llvm/IR/Constants.h"
+//#include "llvm/IR/DerivedTypes.h"
+//#include "llvm/IR/Function.h"
+//#include "llvm/IR/Instructions.h"
+//#include "llvm/IR/IRBuilder.h"
+//#include "llvm/IR/LLVMContext.h"
+//#include "llvm/IR/LegacyPassManager.h"
+//#include "llvm/IR/Module.h"
+//#include "llvm/IR/Type.h"
+//#include "llvm/IR/Verifier.h"
+//#include "llvm/Support/FileSystem.h"
+//#include "llvm/Support/Host.h"
+//#include "llvm/Support/raw_ostream.h"
+//#include "llvm/Support/TargetRegistry.h"
+//#include "llvm/Support/TargetSelect.h"
+//#include "llvm/Target/TargetMachine.h"
+//#include "llvm/Target/TargetOptions.h"
 #include "../Parser/node.h"
 #include <algorithm>
 #include <cassert>
@@ -58,33 +69,25 @@ private:
 
     Value* codegen(node* n);
 
-    Module* make_mod(node* n);
     Module* codegen_program_root(node* n);
+    void* codegen_statement_block(node* n);
 
     Function* codegen_function(node* n, Module* m);
     Value* codegen_function_body(node* n);
 
+    void* codegen_variable_assignment(node* n);
+
     Value* codegen_literal_integer(node* n);
     Value* codegen_literal_float(node* n);
+    Value* codegen_multiply(node* n);
     Value* codegen_literal_boolean(node* n);
 
-    Value* codegen_addition(node* n);
+    Value* codegen_expression(node *n);
+    Value* codegen_arith_op(node *n, Value* n2 = nullptr);
+    Value* codegen_term(node *n, Value* n2 = nullptr);
+    Value* codegen_relation(node *n);
+    Value* codegen_factor(node *n);
 };
 
 
-
-//class ExprAST {
-//public:
-//    virtual ~ExprAST() {}
-////    virtual Value *codegen() = 0;
-//};
-//
-///// NumberExprAST - Expression class for numeric literals like "1.0".
-//class NumberExprAST : public ExprAST {
-//    double Val;
-//
-//public:
-//    NumberExprAST(double Val) : Val(Val) {}
-//    virtual Value *codegen();
-//};
 #endif //COMPILER_5183_CODE_GENERATION_H
