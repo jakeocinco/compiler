@@ -66,10 +66,13 @@ private:
     void write_to_file(Module* m);
 
     node* tree;
+    std::map<std::string, AllocaInst*> identifiers;
 
+    IRBuilder<>* b2;
     Value* codegen(node* n);
 
     Module* codegen_program_root(node* n);
+    void codegen_declaration_block(node* n, IRBuilder<>* b);
     void codegen_statement_block(node* n, IRBuilder<>* b);
 
     Function* codegen_function(node* n, Module* m);

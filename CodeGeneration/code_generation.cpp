@@ -40,9 +40,6 @@ Module* code_generation::codegen_program_root(node *n) {
     n->children.pop_front(); // Popping program name
     n->children.pop_front(); // Popping is
 
-    n->children.pop_front(); // ignoring declaration block for now
-    n->children.pop_front(); // Popping begin
-
     auto* m = new Module(program_name, context);
 
     Function* f = m->getFunction("mul");
@@ -56,7 +53,12 @@ Module* code_generation::codegen_program_root(node *n) {
     for (auto &Arg : f->args())
         namedValues.insert_or_assign(Arg.getName().str(), &Arg);
 
+
     if (Value* returnVal = codegen_function_body(nullptr)){
+        codegen_declaration_block(n->children.front(), &builder);
+        n->children.pop_front(); // ignoring declaration block for now
+        n->children.pop_front(); // Popping begin
+
         //    codegen_statement_block(n->children.front());
 //        node* t = node::create_integer_literal_node(5);
 //        Value* v = codegen_literal_integer(t);
@@ -70,18 +72,35 @@ Module* code_generation::codegen_program_root(node *n) {
     return m;
 }
 
+void code_generation::codegen_declaration_block(node *n, IRBuilder<>* b) {
+    for (node* x : n->children){
+        if (x->type == T_VARIABLE_DECLARATION) codegen_variable_declaration(x, b);
+    }
+}
 void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     for (node* x : n->children){
         if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
     }
 }
 
+
+void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
+    n->children.pop_front(); // variable
+    string s = n->children.front()->val.stringValue;
+    n->children.pop_front(); // variable name
+    n->children.pop_front(); // colon
+    n->children.pop_front(); // type -- WILL be important
+    AllocaInst* alloca = builder.CreateAlloca(Type::getInt32Ty(context), 0, s.c_str());
+    identifiers.insert_or_assign(s, alloca);
+    //    builder.CreateStore()
+}
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
     n->children.pop_front();
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
-    builder.CreateAlloca(Type::getInt32Ty(context), v, s);
+    b->CreateStore(v, identifiers.at(s));
+//    builder.CreateAlloca(Type::getInt32Ty(context), v, s);
 }
 
 
@@ -153,9 +172,9 @@ Value *code_generation::codegen_arith_op(node *n,  Value* n2) {
                 return codegen_arith_op(n, builder.CreateFAdd(lhs, rhs, "addtmp"));
         case T_MINUS:
             if (n->children.empty())
-                return builder.CreateFSub(lhs, rhs, "addtmp");
+                return builder.CreateFSub(lhs, rhs, "subtmp");
             else
-                return codegen_arith_op(n, builder.CreateFSub(lhs, rhs, "addtmp"));
+                return codegen_arith_op(n, builder.CreateFSub(lhs, rhs, "subtmp"));
         default:
             cout << "Error" << endl;
     }
@@ -206,7 +225,7 @@ Value *code_generation::codegen_factor(node *n) {
     if (x->type == T_FLOAT_LITERAL)
         return codegen_literal_float(x);
     if (x->type == T_IDENTIFIER)
-        return codegen_literal_integer(node::create_integer_literal_node(2));
+        return builder.CreateLoad(identifiers.at(x->val.stringValue));
     return nullptr;
 }
 
