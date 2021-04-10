@@ -326,15 +326,14 @@ node* parser::parse_expression(unsigned& code, node* n ){
 
     if (current.type == T_NOT){
         n->newChild(expecting_reserved_word(T_NOT, "not"));
-        n->newChild(parse_arith(code));
         code = T_RELATION;
-    } else {
-        n->newChild(parse_arith(code));
-        if (current.type == T_AND || current.type == T_OR){
-            n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
-            parse_expression(code, n);
-            code = T_RELATION;
-        }
+    }
+
+    n->newChild(parse_arith(code));
+    if (current.type == T_AND || current.type == T_OR){
+        n->newChild(expecting_reserved_word(current.type, current.val.stringValue));
+        parse_expression(code, n);
+        code = T_RELATION;
     }
 
     return n;
