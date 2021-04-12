@@ -24,15 +24,6 @@ code_generation::code_generation(std::string file_text) {
     m->print(llvm::outs(), nullptr);
 }
 
-
-Value *code_generation::codegen(node* n) {
-    if (n->type == T_INTEGER_LITERAL) return codegen_literal_integer(n);
-    if (n->type == T_FLOAT_LITERAL) return codegen_literal_float(n);
-//    if (n->type == T_MULTIPLY) return codegen_multiply(n);
-//    if (n->type == T_EXPRESSION) return codegen_multiply(n);
-    return nullptr;
-}
-
 Module* code_generation::codegen_program_root(node *n) {
 
     n->children.pop_front(); // Popping program
@@ -83,6 +74,12 @@ void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     }
 }
 
+void code_generation::codegen_if_statement(node* n) {
+    n->children.pop_front(); // Popping if
+    Value* condition = codegen_expression(n->children.front());
+//    n->children.pop_front(); // Popping program name
+//    n->children.pop_front(); // Popping is
+}
 
 void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     n->children.pop_front(); // variable
@@ -125,36 +122,69 @@ Function *code_generation::codegen_function(node *n, Module* m) {
 }
 
 Value *code_generation::codegen_function_body(node *n) {
-    node* x = node::create_integer_literal_node(42);
-    return codegen_literal_integer(x);
+//    node* x = node::create_integer_literal_node(42);
+    return codegen_literal_integer(42);
 }
 
-Value *code_generation::codegen_literal_integer(node *n) {
-    return ConstantInt::get(context, APInt(4 * 8,n->val.intValue));
+Value *code_generation::codegen_literal_integer(int n) {
+    return ConstantFP::get(context, APFloat(static_cast<double>(n)));
 }
 
-Value *code_generation::codegen_literal_float(node *n) {
-    return ConstantFP::get(context, APFloat(n->val.doubleValue));
+Value *code_generation::codegen_literal_float(double n) {
+    return ConstantFP::get(context, APFloat(n));
 }
 
-Value *code_generation::codegen_literal_boolean(node *n) {
+Value *code_generation::codegen_expression(node *n,  Value* lhs) {
+
+    if (n->children.empty())
+        return lhs;
+
+    bool is_not_l = false;
+    if (n->children.front()->type == T_NOT){
+        n->children.pop_front();  // Pop not
+        is_not_l = true;
+    }
+
+    if (n->children.size() == 1)
+        return codegen_arith_op(n->children.front()); // flip if is_not_l
+
+    if (lhs == nullptr){
+        lhs = codegen_relation(n->children.front());
+        n->children.pop_front();
+    }
+
+    int operation = n->children.front()->type;
+    n->children.pop_front(); // Pop sign
+
+    bool is_not_r = false;
+    if (n->children.front()->type == T_NOT){
+        n->children.pop_front(); // Pop not
+        is_not_r = true;
+    }
+    Value* rhs = codegen_relation(n->children.front());
+    n->children.pop_front(); // Pop RHS
+
+    // check flips
+    switch (operation) {
+        case T_ADD:
+            return codegen_arith_op(n, builder.CreateFAdd(lhs, rhs, "addtmp"));
+        case T_MINUS:
+            return codegen_arith_op(n, builder.CreateFSub(lhs, rhs, "subtmp"));
+        default:
+            cout << "Error" << endl;
+    }
+
+
     return nullptr;
 }
+Value *code_generation::codegen_arith_op(node *n,  Value* lhs) {
 
-Value *code_generation::codegen_expression(node *n) {
-    Value* v =  codegen_arith_op(n->children.front());
-    return v;
-}
-
-Value *code_generation::codegen_arith_op(node *n,  Value* n2) {
-
+    if (n->children.empty())
+        return lhs;
     if (n->children.size() == 1)
         return codegen_relation(n->children.front());
 
-    Value* lhs = nullptr;
-    if (n2 != nullptr){
-        lhs = n2;
-    } else {
+    if (lhs == nullptr){
         lhs = codegen_relation(n->children.front());
         n->children.pop_front();
     }
@@ -166,53 +196,69 @@ Value *code_generation::codegen_arith_op(node *n,  Value* n2) {
 
     switch (operation) {
         case T_ADD:
-            if (n->children.empty())
-                return builder.CreateFAdd(lhs, rhs, "addtmp");
-            else
-                return codegen_arith_op(n, builder.CreateFAdd(lhs, rhs, "addtmp"));
+            return codegen_arith_op(n, builder.CreateFAdd(lhs, rhs, "addtmp"));
         case T_MINUS:
-            if (n->children.empty())
-                return builder.CreateFSub(lhs, rhs, "subtmp");
-            else
-                return codegen_arith_op(n, builder.CreateFSub(lhs, rhs, "subtmp"));
+            return codegen_arith_op(n, builder.CreateFSub(lhs, rhs, "subtmp"));
         default:
             cout << "Error" << endl;
     }
     return nullptr;
 }
-Value *code_generation::codegen_relation(node *n) {
-    return codegen_term(n->children.front());
+Value *code_generation::codegen_relation(node *n, Value* lhs) {
+
+    if (n->children.empty())
+        return lhs;
+    if (n->children.size() == 1)
+        return codegen_term(n->children.front());
+
+    if (lhs == nullptr){
+        lhs = codegen_term(n->children.front());
+        n->children.pop_front(); // Pop lhs
+    }
+    int operation = n->children.front()->type;
+    n->children.pop_front(); // Pop operation
+    Value* rhs = codegen_term(n->children.front());
+    n->children.pop_front(); // Pop rhs
+    switch (operation) {
+        case T_L_THAN:
+            return codegen_term(n, builder.CreateFCmpULT(lhs, rhs, "lthan"));
+        case T_LE_THAN:
+            return codegen_term(n, builder.CreateFCmpULE(lhs, rhs, "lehan"));
+        case T_G_THAN:
+            return codegen_term(n, builder.CreateFCmpUGT(lhs, rhs, "gthan"));
+        case T_GE_THAN:
+            return codegen_term(n, builder.CreateFCmpUGE(lhs, rhs, "gthan"));
+        case T_D_EQUALS:
+            return codegen_term(n, builder.CreateFCmpUEQ(lhs, rhs, "equals"));
+        case T_N_EQUALS:
+            return codegen_term(n, builder.CreateFCmpUNE(lhs, rhs, "equals"));
+        default:
+            cout << "Error" << endl;
+    }
+    return nullptr;
 }
-Value *code_generation::codegen_term(node *n, Value* n2) {
+Value *code_generation::codegen_term(node *n, Value* lhs) {
+
+    if (n->children.empty())
+        return lhs;
     if (n->children.size() == 1)
         return codegen_factor(n->children.front());
 
-    Value* lhs = nullptr;
-    if (n2 != nullptr){
-        lhs = n2;
-    } else {
+    if (lhs == nullptr){
         lhs = codegen_factor(n->children.front());
         n->children.pop_front();
     }
 
     int operation = n->children.front()->type;
     n->children.pop_front();
-
-
     Value* rhs = codegen_factor(n->children.front());
     n->children.pop_front();
 
     switch (operation) {
         case T_MULTIPLY:
-            if (n->children.empty())
-                return builder.CreateFMul(lhs, rhs, "multmp");
-            else
-                return codegen_term(n, builder.CreateFMul(lhs, rhs, "multmp"));
+            return codegen_term(n, builder.CreateFMul(lhs, rhs, "multmp"));
         case T_DIVIDE:
-            if (n->children.empty())
-                return builder.CreateFDiv(lhs, rhs, "divtmp");
-            else
-                return codegen_term(n, builder.CreateFDiv(lhs, rhs, "divtmp"));
+            return codegen_term(n, builder.CreateFDiv(lhs, rhs, "divtmp"));
         default:
             cout << "Error" << endl;
     }
@@ -221,13 +267,20 @@ Value *code_generation::codegen_term(node *n, Value* n2) {
 Value *code_generation::codegen_factor(node *n) {
     node* x = n->children.front();
     if (x->type == T_INTEGER_LITERAL)
-        return codegen_literal_integer(x);
+        return codegen_literal_integer(x->val.intValue);
     if (x->type == T_FLOAT_LITERAL)
-        return codegen_literal_float(x);
+        return codegen_literal_float(x->val.doubleValue);
     if (x->type == T_IDENTIFIER)
         return builder.CreateLoad(identifiers.at(x->val.stringValue));
+    if (x->type == T_FALSE)
+        return builder.CreateFCmpOEQ(codegen_literal_integer(0), codegen_literal_integer(1), "false");
+    if (x->type == T_TRUE){
+        return builder.CreateFCmpOEQ(codegen_literal_integer(0), codegen_literal_integer(0), "true");
+    }
     return nullptr;
 }
+
+
 
 
 

@@ -81,15 +81,17 @@ private:
     void codegen_variable_declaration(node* n, IRBuilder<>* b);
     void codegen_variable_assignment(node* n, IRBuilder<>* b);
 
-    Value* codegen_literal_integer(node* n);
-    Value* codegen_literal_float(node* n);
+    void codegen_if_statement(node* n);
+
+    Value* codegen_literal_integer(int n);
+    Value* codegen_literal_float(double n);
     Value* codegen_multiply(node* n);
     Value* codegen_literal_boolean(node* n);
 
-    Value* codegen_expression(node *n);
-    Value* codegen_arith_op(node *n, Value* n2 = nullptr);
-    Value* codegen_term(node *n, Value* n2 = nullptr);
-    Value* codegen_relation(node *n);
+    Value* codegen_expression(node *n, Value* lhs = nullptr);
+    Value* codegen_arith_op(node *n, Value* lhs = nullptr);
+    Value* codegen_relation(node *n, Value* lhs = nullptr);
+    Value* codegen_term(node *n, Value* lhs = nullptr);
     Value* codegen_factor(node *n);
 };
 
