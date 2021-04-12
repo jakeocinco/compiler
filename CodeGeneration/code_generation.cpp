@@ -56,9 +56,18 @@ Module* code_generation::codegen_program_root(node *n) {
 //        Value* v = codegen_literal_integer(t);
 //        Value* temp = builder.CreateMul(v, v, "multemp");
 //        builder.CreateAlloca(Type::getInt32Ty(context), temp, "a");
-            codegen_statement_block(n->children.front(), &builder);
+
+        codegen_statement_block(n->children.front(), &builder);
         n->children.pop_front();
-        builder.CreateRet(returnVal);
+
+//        codegen_print_prototype(context, m, ConstantInt::get(context, APInt(32, 69))
+        Value* v = builder.CreateGlobalString("jake");
+        codegen_print_prototype(context, m, codegen_literal_integer(69));
+        codegen_print_prototype(context, m, codegen_literal_float(69.6));
+        codegen_print_prototype(context, m, builder.CreateLoad(identifiers.at("var1")));
+        codegen_print_prototype(context, m,  v);
+
+        builder.CreateRet(ConstantInt::get(context, APInt(32,0)));
 //        verifyFunction(*f);
     }
     return m;
@@ -136,8 +145,8 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
 
 Function *code_generation::codegen_function(node *n, Module* m) {
 
-    std::vector<std::string> args = {"x","y","z"};
-    std::string name = "Jake";
+    std::vector<std::string> args = {};
+    std::string name = "main";
 
     std::vector<Type*> Integers(args.size(),
                                Type::getDoubleTy(context));
@@ -310,6 +319,33 @@ Value *code_generation::codegen_factor(node *n) {
     if (x->type == T_TRUE){
         return builder.CreateFCmpOEQ(codegen_literal_integer(0), codegen_literal_integer(0), "true");
     }
+    return nullptr;
+}
+
+Function* code_generation::codegen_print_prototype(LLVMContext &ctx, Module *mod, Value* v) {
+
+
+    Function* printer = mod->getFunction("printf");
+    if (printer == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getInt8PtrTy(context));
+
+        FunctionType *printfType = FunctionType::get(builder.getInt32Ty(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "printf",
+                         mod);
+    }
+
+
+    std::vector<Value *> printArgs;
+    Value *formatStr = builder.CreateGlobalStringPtr("%f\n");
+    printArgs.push_back(formatStr);
+
+    /*We will be printing "20"*/
+//
+//    printArgs.push_back(v);
+    printArgs.push_back(v);
+    builder.CreateCall(mod->getFunction("printf"), printArgs);
+
     return nullptr;
 }
 
