@@ -6,10 +6,10 @@ program LoopFib is
 begin
     var1 := 2;
     temp := var1 * 4;
-    boolTemp := var1 > temp;
-    /*if ( not var1 > 0 | var1 < -4) then
+    if ( var1 > 0 ) then
         var2 := temp;
     else
-         var2 := 2;
-    end if;*/
+        var2 := 2;
+    end if;
+    //boolTemp := var1 > temp;
 end program.

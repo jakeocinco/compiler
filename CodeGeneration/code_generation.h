@@ -7,7 +7,7 @@
 
 //#include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
-//#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Module.h"
 //#include "llvm/IR/PassManager.h"
 //#include "llvm/IR/CallingConv.h"

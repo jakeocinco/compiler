@@ -21,7 +21,8 @@ code_generation::code_generation(std::string file_text) {
     else
         std::cout << "Not program root" << endl;
 
-    m->print(llvm::outs(), nullptr);
+    llvm::raw_ostream& output = llvm::outs();
+    m->print(output, nullptr);
 }
 
 Module* code_generation::codegen_program_root(node *n) {
@@ -56,7 +57,7 @@ Module* code_generation::codegen_program_root(node *n) {
 //        Value* temp = builder.CreateMul(v, v, "multemp");
 //        builder.CreateAlloca(Type::getInt32Ty(context), temp, "a");
             codegen_statement_block(n->children.front(), &builder);
-//        n->children.pop_front();
+        n->children.pop_front();
         builder.CreateRet(returnVal);
 //        verifyFunction(*f);
     }
@@ -71,14 +72,46 @@ void code_generation::codegen_declaration_block(node *n, IRBuilder<>* b) {
 void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     for (node* x : n->children){
         if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
+        if (x->type == T_IF_BLOCK) codegen_if_statement(x);
     }
 }
 
 void code_generation::codegen_if_statement(node* n) {
     n->children.pop_front(); // Popping if
     Value* condition = codegen_expression(n->children.front());
-//    n->children.pop_front(); // Popping program name
-//    n->children.pop_front(); // Popping is
+    n->children.pop_front(); // Popping expression
+    n->children.pop_front(); // Popping then
+
+    Function* function = builder.GetInsertBlock()->getParent();
+    BasicBlock* thenBB = BasicBlock::Create(context, "then", function);
+    BasicBlock* elseBB = BasicBlock::Create(context, "else");
+    BasicBlock* mergeBB = BasicBlock::Create(context, "ifcont");
+
+    builder.CreateCondBr(condition, thenBB, elseBB);
+    builder.SetInsertPoint(thenBB);
+
+    codegen_statement_block(n->children.front(), &builder);
+    n->children.pop_front();
+    n->children.pop_front(); // Popping else if there
+
+    builder.CreateBr(mergeBB);
+    thenBB = builder.GetInsertBlock();
+
+
+    function->getBasicBlockList().push_back(elseBB);
+    builder.SetInsertPoint(elseBB);
+
+    codegen_statement_block(n->children.front(), &builder);
+    n->children.pop_front();
+
+    builder.CreateBr(mergeBB);
+    elseBB = builder.GetInsertBlock();
+
+    function->getBasicBlockList().push_back(mergeBB);
+    builder.SetInsertPoint(mergeBB);
+//    PHINode* pn = builder.CreatePHI(Type::getDoubleTy(context), 2, "iftmp");
+
+//    pn->addIncoming(thenB)
 }
 
 void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
@@ -87,7 +120,7 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     n->children.pop_front(); // variable name
     n->children.pop_front(); // colon
     n->children.pop_front(); // type -- WILL be important
-    AllocaInst* alloca = builder.CreateAlloca(Type::getInt32Ty(context), 0, s.c_str());
+    AllocaInst* alloca = builder.CreateAlloca(Type::getDoubleTy(context), 0, s.c_str());
     identifiers.insert_or_assign(s, alloca);
     //    builder.CreateStore()
 }
