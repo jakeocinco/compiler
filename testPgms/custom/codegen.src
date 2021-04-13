@@ -4,8 +4,8 @@ program LoopFib is
     variable var2 : integer;
     variable booltemp : bool;
 begin
-    var1 := 2 < 4;
-    var2 := 2;
+    var1 := 9 / 3;
+    var2 := 2 - 4;
     /*temp := var1 * 4;
     if ( var1 > 0 ) then
         var2 := temp;

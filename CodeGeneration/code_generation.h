@@ -52,6 +52,8 @@
 #include <utility>
 #include <vector>
 
+#define CALL_MEMBER_FN(object, ptrToMember)  ((object).*(ptrToMember))
+
 using namespace llvm;
 using namespace llvm::sys;
 
@@ -64,6 +66,19 @@ class code_generation {
 public:
     code_generation(std::string file_text);
 private:
+
+    LLVMContext context;
+    IRBuilder<>* builder;
+//    ()(llvm::Value *, llvm::Value *, const llvm::Twine &, bool, bool
+    typedef  Value* (llvm::IRBuilderBase::*memFn)(llvm::Value *, llvm::Value *, const llvm::Twine &);
+
+    struct _operator_block {
+        int type; // one of the token codes from above
+        std::function<bool()> standard_op;
+        std::function<bool()> floating_op;
+        Value* lhs;
+        Value* rhs;
+    };
 
     void write_to_file(Module* m);
 
@@ -101,6 +116,10 @@ private:
     void codegen_print_string(Module* mod, Value* v);
     void codegen_print_double(Module* mod, Value* v);
     void codegen_print_integer(Module* mod, Value* v);
+
+    Value* operation_block(std::function<Value*(Value* lhs, Value* rhs)> floating_op,
+                           Value* lhs, Value* rhs);
+    Value* test_mult(Value* l, Value* r);
 };
 
 
