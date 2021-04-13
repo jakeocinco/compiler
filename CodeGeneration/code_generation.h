@@ -97,7 +97,7 @@ private:
 
     void codegen_variable_declaration(node* n, IRBuilder<>* b);
     void codegen_variable_assignment(node* n, IRBuilder<>* b);
-
+    Type* get_type(node *n);
     void codegen_if_statement(node* n);
 
     Value* codegen_literal_integer(int n);
@@ -116,9 +116,10 @@ private:
     void codegen_print_string(Module* mod, Value* v);
     void codegen_print_double(Module* mod, Value* v);
     void codegen_print_integer(Module* mod, Value* v);
+    void codegen_print_boolean(Module* mod, Value* v);
 
-    Value* operation_block(std::function<Value*(Value* lhs, Value* rhs)> floating_op,
-                           Value* lhs, Value* rhs);
+    Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
+                           Value* lhs, Value* rhs, bool is_comparison = false);
     Value* test_mult(Value* l, Value* r);
 };
 
