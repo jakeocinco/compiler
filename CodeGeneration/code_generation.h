@@ -96,7 +96,11 @@ private:
     Value* codegen_term(node *n, Value* lhs = nullptr);
     Value* codegen_factor(node *n);
 
-    Function* codegen_print_prototype(LLVMContext &ctx, Module *mod, Value *v);
+    void codegen_print_prototype(Module *mod);
+    void codegen_print_base(Module* mod, Value* v, Value* formatStr);
+    void codegen_print_string(Module* mod, Value* v);
+    void codegen_print_double(Module* mod, Value* v);
+    void codegen_print_integer(Module* mod, Value* v);
 };
 
 

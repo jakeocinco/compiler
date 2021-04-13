@@ -62,10 +62,12 @@ Module* code_generation::codegen_program_root(node *n) {
 
 //        codegen_print_prototype(context, m, ConstantInt::get(context, APInt(32, 69))
         Value* v = builder.CreateGlobalString("jake");
-        codegen_print_prototype(context, m, codegen_literal_integer(69));
-        codegen_print_prototype(context, m, codegen_literal_float(69.6));
-        codegen_print_prototype(context, m, builder.CreateLoad(identifiers.at("var1")));
-        codegen_print_prototype(context, m,  v);
+        codegen_print_prototype(m);
+        codegen_print_integer(m, ConstantInt::get(context, APInt(32, 69)));
+        codegen_print_integer(m, builder.CreateFPToUI(codegen_literal_integer(50), Type::getInt32Ty(context)));
+        codegen_print_double(m, codegen_literal_float(69.6));
+        codegen_print_double(m, builder.CreateLoad(identifiers.at("var1")));
+        codegen_print_string(m,  v);
 
         builder.CreateRet(ConstantInt::get(context, APInt(32,0)));
 //        verifyFunction(*f);
@@ -169,7 +171,8 @@ Value *code_generation::codegen_function_body(node *n) {
 }
 
 Value *code_generation::codegen_literal_integer(int n) {
-    return ConstantFP::get(context, APFloat(static_cast<double>(n)));
+    return ConstantInt::get(Type::getInt32Ty(context), APInt(32, n));
+//    return ConstantFP::get(context, APFloat(static_cast<double>(n)));
 }
 
 Value *code_generation::codegen_literal_float(double n) {
@@ -322,7 +325,7 @@ Value *code_generation::codegen_factor(node *n) {
     return nullptr;
 }
 
-Function* code_generation::codegen_print_prototype(LLVMContext &ctx, Module *mod, Value* v) {
+void code_generation::codegen_print_prototype(Module *mod) {
 
 
     Function* printer = mod->getFunction("printf");
@@ -334,19 +337,40 @@ Function* code_generation::codegen_print_prototype(LLVMContext &ctx, Module *mod
         Function::Create(printfType, Function::ExternalLinkage, "printf",
                          mod);
     }
+}
 
+void code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr) {
 
     std::vector<Value *> printArgs;
-    Value *formatStr = builder.CreateGlobalStringPtr("%f\n");
+
     printArgs.push_back(formatStr);
-
-    /*We will be printing "20"*/
-//
-//    printArgs.push_back(v);
     printArgs.push_back(v);
-    builder.CreateCall(mod->getFunction("printf"), printArgs);
 
-    return nullptr;
+    builder.CreateCall(mod->getFunction("printf"), printArgs);
+}
+
+void code_generation::codegen_print_string(Module *mod, Value *v) {
+    if (!namedValues.contains(".str")){
+        Value *formatStr = builder.CreateGlobalStringPtr("%s\n", ".str");
+        namedValues.insert_or_assign(".str", formatStr);
+    }
+    codegen_print_base(mod, v, namedValues.at(".str"));
+}
+
+void code_generation::codegen_print_double(Module *mod, Value *v) {
+    if (!namedValues.contains(".double")){
+        Value *formatStr = builder.CreateGlobalStringPtr("%g\n", ".double");
+        namedValues.insert_or_assign(".double", formatStr);
+    }
+    codegen_print_base(mod, v, namedValues.at(".double"));
+}
+void code_generation::codegen_print_integer(Module *mod, Value *v) {
+    if (!namedValues.contains(".int")){
+        Value *formatStr = builder.CreateGlobalStringPtr("%d\n", ".int");
+        namedValues.insert_or_assign(".int", formatStr);
+    }
+    // change integers to actually be ints ... maybe
+    codegen_print_base(mod, v, namedValues.at(".int"));
 }
 
 
