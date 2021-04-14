@@ -116,17 +116,6 @@ std::map<string, int> scanner::get_reserved_words() {
     r.insert_or_assign(":=",T_COLON_EQUALS);
     r.insert_or_assign("/*", T_BLOCK_COMMENT_OPEN);
     r.insert_or_assign("*/", T_BLOCK_COMMENT_CLOSE);
-    // BUILT IN FUNCTIONS
-    r.insert_or_assign("getbool",T_GET_BOOL);
-    r.insert_or_assign("getinteger",T_GET_INTEGER);
-    r.insert_or_assign("getfloat",T_GET_FLOAT);
-    r.insert_or_assign("getstring",T_GET_STRING);
-    r.insert_or_assign("putbool",T_PUT_BOOL);
-    r.insert_or_assign("putinteger",T_PUT_INTEGER);
-    r.insert_or_assign("putfloat",T_PUT_FLOAT);
-    r.insert_or_assign("putstring",T_PUT_STRING);
-    r.insert_or_assign("sqrt",T_SQRT);
-
 
     return r;
 }

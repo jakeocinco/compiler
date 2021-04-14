@@ -716,6 +716,7 @@ void parser::initialize_symbol_table() {
     push_new_identifier_to_symbol_table("putinteger", T_PUT_INTEGER);
     push_new_identifier_to_symbol_table("putfloat", T_PUT_FLOAT);
     push_new_identifier_to_symbol_table("putstring", T_PUT_STRING);
+    push_new_identifier_to_symbol_table("sqrt", T_FLOAT_LITERAL);
 }
 void parser::push_new_identifier_to_symbol_table(string identifier, int n) {
     current_table->add_symbol(identifier, n);

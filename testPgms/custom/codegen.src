@@ -4,11 +4,15 @@ program LoopFib is
     variable var2 : float;
     variable booltemp : bool;
 begin
-    var1 := 3 - 4;
-    temp := 30.0;
-    boolTemp := true;
-    if ( false ) then
+    var1 := 5 / 3;
+    var2 := 5.0 / 3;
+    booltemp := putInteger(var1);
+    booltemp := putFloat(var2);
+    //temp := 30.0;
+    //boolTemp := true;
+    if ( true ) then
         var2 := temp;
+        booltemp := putInteger(4);
     else
         var2 := 2.0;
     end if;

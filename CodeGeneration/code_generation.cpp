@@ -17,14 +17,13 @@ code_generation::code_generation(std::string file_text) {
     IRBuilder<> temp = IRBuilder<>(context);
     builder = &(temp);
 
-    Module* m = nullptr;
     if (this->tree->type == T_PROGRAM_ROOT)
-        m = codegen_program_root(this->tree);
+        codegen_program_root(this->tree);
     else
         std::cout << "Not program root" << endl;
 
     llvm::raw_ostream& output = llvm::outs();
-    m->print(output, nullptr);
+    this->m->print(output, nullptr);
 }
 
 Module* code_generation::codegen_program_root(node *n) {
@@ -34,7 +33,7 @@ Module* code_generation::codegen_program_root(node *n) {
     n->children.pop_front(); // Popping program name
     n->children.pop_front(); // Popping is
 
-    auto* m = new Module(program_name, context);
+    m = new Module(program_name, context);
 
     Function* f = m->getFunction("mul");
     if (!f)
@@ -50,29 +49,16 @@ Module* code_generation::codegen_program_root(node *n) {
 
     if (Value* returnVal = codegen_function_body(nullptr)){
         codegen_declaration_block(n->children.front(), builder);
+
+        codegen_print_prototype(m); // Move this inside
+
         n->children.pop_front(); // ignoring declaration block for now
         n->children.pop_front(); // Popping begin
-
-        //    codegen_statement_block(n->children.front());
-//        node* t = node::create_integer_literal_node(5);
-//        Value* v = codegen_literal_integer(t);
-//        Value* temp = builder.CreateMul(v, v, "multemp");
-//        builder.CreateAlloca(Type::getInt32Ty(context), temp, "a");
 
         codegen_statement_block(n->children.front(), builder);
         n->children.pop_front();
 
-//        codegen_print_prototype(context, m, ConstantInt::get(context, APInt(32, 69))
         Value* v = builder->CreateGlobalString("jake");
-
-        codegen_print_prototype(m);
-//        codegen_print_integer(m, ConstantInt::get(context, APInt(32, -69)));
-//        codegen_print_integer(m, builder->CreateFPToUI(codegen_literal_integer(50), Type::getInt32Ty(context)));
-//        codegen_print_double(m, codegen_literal_float(69.6));
-        codegen_print_integer(m, builder->CreateLoad(identifiers.at("var1")));
-        codegen_print_double(m, builder->CreateLoad(identifiers.at("var2")));
-//        codegen_print_string(m,  v);
-        codegen_print_boolean(m, builder->CreateLoad(identifiers.at("booltemp")));
 
         builder->CreateRet(ConstantInt::get(context, APInt(32,0)));
 //        verifyFunction(*f);
@@ -180,10 +166,15 @@ Value *code_generation::codegen_function_body(node *n) {
 
 Value *code_generation::codegen_literal_integer(int n) {
     return ConstantInt::get(Type::getInt32Ty(context), APInt(32, n));
-//    return ConstantFP::get(context, APFloat(static_cast<double>(n)));
 }
 Value *code_generation::codegen_literal_float(double n) {
     return ConstantFP::get(context, APFloat(n));
+}
+Value *code_generation::codegen_literal_boolean(bool n) {
+    return ConstantInt::get(Type::getInt1Ty(context), APInt(1, n ? 1 : 0));
+}
+Value *code_generation::codegen_literal_string(std::string  n) {
+    return nullptr;
 }
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
@@ -345,13 +336,30 @@ Value *code_generation::codegen_factor(node *n) {
         return codegen_literal_integer(x->val.intValue);
     if (x->type == T_FLOAT_LITERAL)
         return codegen_literal_float(x->val.doubleValue);
-    if (x->type == T_IDENTIFIER)
+    if (x->type == T_IDENTIFIER) {
         return builder->CreateLoad(identifiers.at(x->val.stringValue));
-    if (x->type == T_FALSE)
-        return builder->CreateFCmpOEQ(codegen_literal_float(0), codegen_literal_float(1), "false");
-    if (x->type == T_TRUE){
-        return builder->CreateFCmpOEQ(codegen_literal_float(0), codegen_literal_float(0), "true");
     }
+    if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
+        if (string("putinteger") == x->children.front()->val.stringValue) {
+            x->children.pop_front();
+            return codegen_print_integer(m,codegen_expression(x->children.front()));
+        }  else if (string("putfloat") == x->children.front()->val.stringValue){
+            x->children.pop_front();
+            return codegen_print_double(m,codegen_expression(x->children.front()));
+        }   else if (string("putstring") == x->children.front()->val.stringValue) {
+            x->children.pop_front();
+            return codegen_print_string(m, codegen_expression(x->children.front()));
+        }   else if (string("putboolean") == x->children.front()->val.stringValue) {
+            x->children.pop_front();
+            return codegen_print_boolean(m, codegen_expression(x->children.front()));
+        }
+    }
+    if (x->type == T_FALSE)
+        return codegen_literal_boolean(false);
+    if (x->type == T_TRUE)
+        return codegen_literal_boolean(true);
+    if (x->type == T_STRING_LITERAL)
+        return codegen_literal_boolean(true);
     return nullptr;
 }
 
@@ -368,7 +376,7 @@ void code_generation::codegen_print_prototype(Module *mod) {
                          mod);
     }
 }
-void code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr) {
+Value* code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr) {
 
     std::vector<Value *> printArgs;
 
@@ -376,36 +384,37 @@ void code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr
     printArgs.push_back(v);
 
     builder->CreateCall(mod->getFunction("printf"), printArgs);
+    return codegen_literal_boolean(true);
 }
-void code_generation::codegen_print_string(Module *mod, Value *v) {
+Value* code_generation::codegen_print_string(Module *mod, Value *v) {
     if (!namedValues.contains(".str")){
         Value *formatStr = builder->CreateGlobalStringPtr("%s\n", ".str");
         namedValues.insert_or_assign(".str", formatStr);
     }
-    codegen_print_base(mod, v, namedValues.at(".str"));
+    return codegen_print_base(mod, v, namedValues.at(".str"));
 }
-void code_generation::codegen_print_double(Module *mod, Value *v) {
+Value* code_generation::codegen_print_double(Module *mod, Value *v) {
     if (!namedValues.contains(".double")){
         Value *formatStr = builder->CreateGlobalStringPtr("%g\n", ".double");
         namedValues.insert_or_assign(".double", formatStr);
     }
-    codegen_print_base(mod, v, namedValues.at(".double"));
+    return codegen_print_base(mod, v, namedValues.at(".double"));
 }
-void code_generation::codegen_print_integer(Module *mod, Value *v) {
+Value* code_generation::codegen_print_integer(Module *mod, Value *v) {
     if (!namedValues.contains(".int")){
         Value *formatStr = builder->CreateGlobalStringPtr("%d\n", ".int");
         namedValues.insert_or_assign(".int", formatStr);
     }
     // change integers to actually be ints ... maybe
-    codegen_print_base(mod, v, namedValues.at(".int"));
+    return codegen_print_base(mod, v, namedValues.at(".int"));
 }
-void code_generation::codegen_print_boolean(Module *mod, Value *v) {
+Value* code_generation::codegen_print_boolean(Module *mod, Value *v) {
     if (!namedValues.contains(".int")){
         Value *formatStr = builder->CreateGlobalStringPtr("%d\n", ".int");
         namedValues.insert_or_assign(".int", formatStr);
     }
     // change integers to actually be ints ... maybe
-    codegen_print_base(mod, v, namedValues.at(".int"));
+    return codegen_print_base(mod, v, namedValues.at(".int"));
 }
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                                         Value* lhs, Value* rhs, bool is_comparison) {
@@ -431,10 +440,6 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
         v = builder->CreateFPToSI(v, rhs_type);
 
     return v;
-}
-
-Value *code_generation::test_mult(Value *l, Value *r) {
-    return nullptr;
 }
 
 Type *code_generation::get_type(node *n) {

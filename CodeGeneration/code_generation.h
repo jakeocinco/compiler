@@ -67,6 +67,7 @@ public:
     code_generation(std::string file_text);
 private:
 
+    Module* m;
     LLVMContext context;
     IRBuilder<>* builder;
 //    ()(llvm::Value *, llvm::Value *, const llvm::Twine &, bool, bool
@@ -102,8 +103,8 @@ private:
 
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
-    Value* codegen_multiply(node* n);
-    Value* codegen_literal_boolean(node* n);
+    Value* codegen_literal_boolean(bool n);
+    Value* codegen_literal_string(std::string n);
 
     Value* codegen_expression(node *n, Value* lhs = nullptr);
     Value* codegen_arith_op(node *n, Value* lhs = nullptr);
@@ -112,15 +113,14 @@ private:
     Value* codegen_factor(node *n);
 
     void codegen_print_prototype(Module *mod);
-    void codegen_print_base(Module* mod, Value* v, Value* formatStr);
-    void codegen_print_string(Module* mod, Value* v);
-    void codegen_print_double(Module* mod, Value* v);
-    void codegen_print_integer(Module* mod, Value* v);
-    void codegen_print_boolean(Module* mod, Value* v);
+    Value* codegen_print_base(Module* mod, Value* v, Value* formatStr);
+    Value* codegen_print_string(Module* mod, Value* v);
+    Value* codegen_print_double(Module* mod, Value* v);
+    Value* codegen_print_integer(Module* mod, Value* v);
+    Value* codegen_print_boolean(Module* mod, Value* v);
 
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, Value* rhs, bool is_comparison = false);
-    Value* test_mult(Value* l, Value* r);
 };
 
 
