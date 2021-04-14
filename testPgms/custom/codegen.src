@@ -1,17 +1,15 @@
 program LoopFib is
     variable var1 : integer;
-    variable temp : integer;
+    variable temp : float;
     variable var2 : float;
     variable booltemp : bool;
 begin
-    var1 := 3 - 2;
-    var2 := 1.5 - 0.5;
-    temp := 0;
-    boolTemp := var2 == var1 & var1 < temp;
-    /*temp := var1 * 4;
-    if ( var1 > 0 ) then
+    var1 := 3 - 4;
+    temp := 30.0;
+    boolTemp := true;
+    if ( false ) then
         var2 := temp;
     else
-        var2 := 2;
-    end if;*/
+        var2 := 2.0;
+    end if;
 end program.

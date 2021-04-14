@@ -348,9 +348,9 @@ Value *code_generation::codegen_factor(node *n) {
     if (x->type == T_IDENTIFIER)
         return builder->CreateLoad(identifiers.at(x->val.stringValue));
     if (x->type == T_FALSE)
-        return builder->CreateFCmpOEQ(codegen_literal_integer(0), codegen_literal_integer(1), "false");
+        return builder->CreateFCmpOEQ(codegen_literal_float(0), codegen_literal_float(1), "false");
     if (x->type == T_TRUE){
-        return builder->CreateFCmpOEQ(codegen_literal_integer(0), codegen_literal_integer(0), "true");
+        return builder->CreateFCmpOEQ(codegen_literal_float(0), codegen_literal_float(0), "true");
     }
     return nullptr;
 }
