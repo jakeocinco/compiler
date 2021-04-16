@@ -156,10 +156,12 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
 
     Type* type = get_type(n->children.front());
+    const int code = n->children.front()->children.front()->type;
     n->children.pop_front(); // type -- WILL be important
 
     AllocaInst* alloca = builder->CreateAlloca(type, 0, s.c_str());
     identifiers.insert_or_assign(s, alloca);
+    needs_reallocated.insert_or_assign(s, code == T_STRING_TYPE);
     //    builder.CreateStore()
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
@@ -167,6 +169,14 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     n->children.pop_front();
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
+    if (needs_reallocated.at(s)){
+        AllocaInst* alloca = builder->CreateAlloca(v->getType(), 0, s);
+        identifiers.insert_or_assign(s, alloca);
+        Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+        Value *i32one = ConstantInt::get(context, APInt(8, 0));
+        Value *indices[2] = {i32zero, i32one};
+//        v = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
+    }
     b->CreateStore(v, identifiers.at(s));
 //    builder.CreateAlloca(Type::getInt32Ty(context), v, s);
 }
@@ -394,7 +404,7 @@ Value *code_generation::codegen_factor(node *n) {
         }   else if (string("putstring") == x->children.front()->val.stringValue) {
             x->children.pop_front();
             Value* tempStr = codegen_expression(x->children.front());
-            AllocaInst* alloca = builder->CreateAlloca(tempStr->getType(), 0, "name");
+            AllocaInst* alloca = builder->CreateAlloca(tempStr->getType(), 0, "print_string_temp");
             builder->CreateStore(tempStr, alloca);
             return codegen_print_string(m, alloca);
         }   else if (string("putboolean") == x->children.front()->val.stringValue) {
@@ -500,7 +510,7 @@ Type *code_generation::get_type(node *n) {
         case T_INTEGER_TYPE: return Type::getInt32Ty(context);
         case T_FLOAT_TYPE: return Type::getDoubleTy(context);
         case T_BOOL_TYPE: return Type::getInt1Ty(context);
-//        case T_STRING_TYPE: return Type::get
+//        case T_STRING_TYPE: return Type::getInt8PtrTy(context);
         case T_STRING_TYPE: return codegen_literal_string("")->getType();
     }
     return nullptr;

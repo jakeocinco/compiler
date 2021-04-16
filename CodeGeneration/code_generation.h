@@ -85,6 +85,7 @@ private:
 
     node* tree;
     std::map<std::string, AllocaInst*> identifiers;
+    std::map<std::string, bool> needs_reallocated;
 
     IRBuilder<>* b2;
     Value* codegen(node* n);
