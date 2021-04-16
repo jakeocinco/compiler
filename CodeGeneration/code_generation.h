@@ -26,19 +26,18 @@
 //#include "llvm/IR/DerivedTypes.h"
 //#include "llvm/IR/Function.h"
 //#include "llvm/IR/Instructions.h"
-//#include "llvm/IR/IRBuilder.h"
 //#include "llvm/IR/LLVMContext.h"
 //#include "llvm/IR/LegacyPassManager.h"
 //#include "llvm/IR/Module.h"
 //#include "llvm/IR/Type.h"
 //#include "llvm/IR/Verifier.h"
-//#include "llvm/Support/FileSystem.h"
-//#include "llvm/Support/Host.h"
-//#include "llvm/Support/raw_ostream.h"
-//#include "llvm/Support/TargetRegistry.h"
-//#include "llvm/Support/TargetSelect.h"
-//#include "llvm/Target/TargetMachine.h"
-//#include "llvm/Target/TargetOptions.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+
 #include "../Parser/node.h"
 #include <algorithm>
 #include <cassert>
@@ -70,6 +69,7 @@ private:
     Module* m;
     LLVMContext context;
     IRBuilder<>* builder;
+    BasicBlock* block;
 //    ()(llvm::Value *, llvm::Value *, const llvm::Twine &, bool, bool
     typedef  Value* (llvm::IRBuilderBase::*memFn)(llvm::Value *, llvm::Value *, const llvm::Twine &);
 
@@ -104,7 +104,7 @@ private:
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
     Value* codegen_literal_boolean(bool n);
-    Value* codegen_literal_string(std::string n);
+    Value* codegen_literal_string(const std::string& n);
 
     Value* codegen_expression(node *n, Value* lhs = nullptr);
     Value* codegen_arith_op(node *n, Value* lhs = nullptr);
@@ -114,13 +114,14 @@ private:
 
     void codegen_print_prototype(Module *mod);
     Value* codegen_print_base(Module* mod, Value* v, Value* formatStr);
-    Value* codegen_print_string(Module* mod, Value* v);
+    Value* codegen_print_string(Module* mod, AllocaInst* v);
     Value* codegen_print_double(Module* mod, Value* v);
     Value* codegen_print_integer(Module* mod, Value* v);
     Value* codegen_print_boolean(Module* mod, Value* v);
 
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, Value* rhs, bool is_comparison = false);
+    Value* generateValue(Module* m);
 };
 
 

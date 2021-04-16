@@ -14,6 +14,39 @@ code_generation::code_generation(std::string file_text) {
     auto p = parser(file_text);
     this->tree = p.get_head();
 
+
+    m = new Module("Program", context);
+
+    auto TargetTriple = sys::getDefaultTargetTriple();
+
+    InitializeAllTargetInfos();
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+//    InitializeAllAsmParsers();
+    InitializeAllAsmPrinters();
+
+    std::string Error;
+    auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
+
+    auto CPU = "generic";
+    auto Features = "";
+
+    TargetOptions opt;
+    auto RM = Optional<Reloc::Model>();
+    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+    m->setDataLayout(TargetMachine->createDataLayout());
+    m->setTargetTriple(TargetTriple);
+
+
+    // Print an error and exit if we couldn't find the requested target.
+    // This generally occurs if we've forgotten to initialise the
+    // TargetRegistry or we have a bogus target triple.
+    if (!Target) {
+        errs() << Error;
+        cout << "ERROR";
+    }
+
     IRBuilder<> temp = IRBuilder<>(context);
     builder = &(temp);
 
@@ -33,7 +66,6 @@ Module* code_generation::codegen_program_root(node *n) {
     n->children.pop_front(); // Popping program name
     n->children.pop_front(); // Popping is
 
-    m = new Module(program_name, context);
 
     Function* f = m->getFunction("mul");
     if (!f)
@@ -41,6 +73,7 @@ Module* code_generation::codegen_program_root(node *n) {
 
     BasicBlock *BB = BasicBlock::Create(context, "entry", f);
     builder->SetInsertPoint(BB);
+    block = BB;
 
     namedValues.clear();
     for (auto &Arg : f->args())
@@ -58,8 +91,7 @@ Module* code_generation::codegen_program_root(node *n) {
         codegen_statement_block(n->children.front(), builder);
         n->children.pop_front();
 
-        Value* v = builder->CreateGlobalString("jake");
-
+//        identifiers.insert_or_assign("words", alloca);
         builder->CreateRet(ConstantInt::get(context, APInt(32,0)));
 //        verifyFunction(*f);
     }
@@ -173,8 +205,21 @@ Value *code_generation::codegen_literal_float(double n) {
 Value *code_generation::codegen_literal_boolean(bool n) {
     return ConstantInt::get(Type::getInt1Ty(context), APInt(1, n ? 1 : 0));
 }
-Value *code_generation::codegen_literal_string(std::string  n) {
-    return nullptr;
+Value *code_generation::codegen_literal_string(const std::string&  n) {
+//    Constant* one = ConstantInt::get(Type::getInt32Ty(context), APInt(32, 1));
+//    Constant* two = ConstantInt::get(Type::getInt32Ty(context), APInt(32, 2));
+//
+//    Type* t = Type::getInt32Ty(context);
+//    ArrayType* at = ArrayType::get(t, 4);
+//    auto data = std::vector<Constant*>{one, two};
+////    ConstantArray::get
+////    Arr
+//
+//    return ConstantArray::get(at, data);
+
+
+    auto ss = StringRef(n);
+    return ConstantDataArray::getString(context, ss, true);
 }
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
@@ -348,7 +393,10 @@ Value *code_generation::codegen_factor(node *n) {
             return codegen_print_double(m,codegen_expression(x->children.front()));
         }   else if (string("putstring") == x->children.front()->val.stringValue) {
             x->children.pop_front();
-            return codegen_print_string(m, codegen_expression(x->children.front()));
+            Value* tempStr = codegen_expression(x->children.front());
+            AllocaInst* alloca = builder->CreateAlloca(tempStr->getType(), 0, "name");
+            builder->CreateStore(tempStr, alloca);
+            return codegen_print_string(m, alloca);
         }   else if (string("putboolean") == x->children.front()->val.stringValue) {
             x->children.pop_front();
             return codegen_print_boolean(m, codegen_expression(x->children.front()));
@@ -359,7 +407,7 @@ Value *code_generation::codegen_factor(node *n) {
     if (x->type == T_TRUE)
         return codegen_literal_boolean(true);
     if (x->type == T_STRING_LITERAL)
-        return codegen_literal_boolean(true);
+        return codegen_literal_string(x->val.stringValue);
     return nullptr;
 }
 
@@ -386,12 +434,17 @@ Value* code_generation::codegen_print_base(Module* mod, Value* v, Value* formatS
     builder->CreateCall(mod->getFunction("printf"), printArgs);
     return codegen_literal_boolean(true);
 }
-Value* code_generation::codegen_print_string(Module *mod, Value *v) {
+Value* code_generation::codegen_print_string(Module *mod, AllocaInst *v) {
     if (!namedValues.contains(".str")){
         Value *formatStr = builder->CreateGlobalStringPtr("%s\n", ".str");
         namedValues.insert_or_assign(".str", formatStr);
     }
-    return codegen_print_base(mod, v, namedValues.at(".str"));
+
+    Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+    Value *i32one = ConstantInt::get(context, APInt(8, 0));
+    Value *indices[2] = {i32zero, i32one};
+    auto ptr = builder->CreateGEP(v, ArrayRef<Value *>(indices, 2));
+    return codegen_print_base(mod,ptr, namedValues.at(".str"));
 }
 Value* code_generation::codegen_print_double(Module *mod, Value *v) {
     if (!namedValues.contains(".double")){
@@ -447,15 +500,44 @@ Type *code_generation::get_type(node *n) {
         case T_INTEGER_TYPE: return Type::getInt32Ty(context);
         case T_FLOAT_TYPE: return Type::getDoubleTy(context);
         case T_BOOL_TYPE: return Type::getInt1Ty(context);
+//        case T_STRING_TYPE: return Type::get
+        case T_STRING_TYPE: return codegen_literal_string("")->getType();
     }
     return nullptr;
 }
 
+Value *code_generation::generateValue(Module *m) {
+    //0. Defs
+    auto str = string("Butt");
+    auto charType = llvm::IntegerType::get(context, 8);
+    auto arrayType = ArrayType::get(charType, str.length() + 1);
+
+    //1. Initialize chars vector
+    std::vector<llvm::Constant *> chars(str.length());
+    for(unsigned int i = 0; i < str.size(); i++) {
+        chars[i] = llvm::ConstantInt::get(charType, str[i]);
+    }
+
+    //1b. add a zero terminator too
+    chars.push_back(llvm::ConstantInt::get(charType, 0));
+
+
+    //2. Initialize the string from the characters
+    auto stringType = llvm::ArrayType::get(charType, chars.size());
+
+    //3. Create the declaration statement
+    auto globalDeclaration = (llvm::GlobalVariable*) m->getOrInsertGlobal(".str", stringType);
+//    globalDeclaration->setInitializer(llvm::ConstantArray::get(stringType, chars));
+//    globalDeclaration->setConstant(true);
+//    globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+//    globalDeclaration->setUnnamedAddr (llvm::GlobalValue::UnnamedAddr::Global);
 
 
 
-
-
+    //4. Return a cast to an i8*
+//    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
+    return ConstantArray::get(arrayType, chars);
+}
 
 
 

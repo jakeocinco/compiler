@@ -3,17 +3,19 @@ program LoopFib is
     variable temp : float;
     variable var2 : float;
     variable booltemp : bool;
+    variable words : string;
 begin
     var1 := 5 / 3;
-    var2 := 5.0 / 3;
+    booltemp := putInteger(var1);
+    booltemp := putString("jakesucks");
+    /*var2 := 5.0 / 3;
     booltemp := putInteger(var1);
     booltemp := putFloat(var2);
     //temp := 30.0;
     //boolTemp := true;
     if ( true ) then
         var2 := temp;
-        booltemp := putInteger(4);
     else
         var2 := 2.0;
-    end if;
+    end if;*/
 end program.
