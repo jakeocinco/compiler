@@ -44,5 +44,14 @@ node *node::create_identifier_literal_node(std::string s, int type) {
     return n;
 }
 
+node::node(const node *n1) {
+    this->type = n1->type;
+    this->val = n1->val;
+//    this->children = n1.children;
+    for (auto a : n1->children){
+        this->children.push_back(new node(a));
+    }
+}
+
 
 

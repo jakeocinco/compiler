@@ -12,6 +12,7 @@
 class node {
 public:
     node(int type);
+    node(const node *n1);
     node(std::string s, int type);
     static node* create_string_literal_node(std::string s);
     static node* create_double_literal_node(double d);

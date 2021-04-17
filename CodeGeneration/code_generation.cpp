@@ -55,8 +55,28 @@ code_generation::code_generation(std::string file_text) {
     else
         std::cout << "Not program root" << endl;
 
-    llvm::raw_ostream& output = llvm::outs();
-    this->m->print(output, nullptr);
+    if (true){
+        llvm::raw_ostream& output = llvm::outs();
+        this->m->print(output, nullptr);
+    }
+
+    auto Filename = "output.o";
+    std::error_code EC;
+    raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
+
+    if (EC) {
+        errs() << "Could not open file: " << EC.message();;
+    }
+
+    legacy::PassManager pass;
+    auto FileType = CGFT_ObjectFile;
+
+    if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+        errs() << "TargetMachine can't emit a file of this type";
+    }
+
+    pass.run(*m);
+    dest.flush();
 }
 
 Module* code_generation::codegen_program_root(node *n) {
@@ -107,6 +127,7 @@ void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     for (node* x : n->children){
         if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
         if (x->type == T_IF_BLOCK) codegen_if_statement(x);
+        if (x->type == T_FOR_LOOP) codegen_for_statement(x);
     }
 }
 
@@ -146,6 +167,33 @@ void code_generation::codegen_if_statement(node* n) {
 //    PHINode* pn = builder.CreatePHI(Type::getDoubleTy(context), 2, "iftmp");
 
 //    pn->addIncoming(thenB)
+}
+void code_generation::codegen_for_statement(node *n) {
+    n->children.pop_front(); // Popping for
+    codegen_variable_assignment(n->children.front(), builder); // processing loop var
+    n->children.pop_front(); // pop loop var assignment
+
+    node* conditional_copy = new node(n->children.front()); // copying conditional
+    Value* start_conditional = codegen_expression(n->children.front());
+    n->children.pop_front(); // Popping expression
+
+    Function* function = builder->GetInsertBlock()->getParent();
+    BasicBlock* loopBB = BasicBlock::Create(context, "loop", function);
+    BasicBlock* continueBB = BasicBlock::Create(context, "forcont");
+
+    builder->CreateCondBr(start_conditional, loopBB, continueBB);
+    builder->SetInsertPoint(loopBB);
+
+    codegen_statement_block(n->children.front(), builder);
+    n->children.pop_front(); // pop statement
+
+    Value *endVal = codegen_expression(conditional_copy); // codegen for end expression
+    builder->CreateCondBr(endVal, loopBB, continueBB);
+    n->children.pop_front(); // Popping end
+    n->children.pop_front(); // Popping for
+
+    function->getBasicBlockList().push_back(continueBB);
+    builder->SetInsertPoint(continueBB);
 }
 
 void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
@@ -548,6 +596,8 @@ Value *code_generation::generateValue(Module *m) {
 //    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
     return ConstantArray::get(arrayType, chars);
 }
+
+
 
 
 

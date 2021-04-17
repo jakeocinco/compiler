@@ -1,7 +1,12 @@
 program LoopFib is
-    variable booltemp : bool;
-    variable words : string;
+    variable loopVal : integer;
+    variable val : integer;
+    variable tempBool : bool;
 begin
-    words := "boop";
-    booltemp := putString(words);
+    val := 5;
+    for(loopVal := 0; loopVal < val)
+        tempBool := putInteger(loopVal);
+        loopVal := loopVal + 1;
+    end for;
+    tempBool := putString("Done");
 end program.

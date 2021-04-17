@@ -101,6 +101,7 @@ private:
     void codegen_variable_assignment(node* n, IRBuilder<>* b);
     Type* get_type(node *n);
     void codegen_if_statement(node* n);
+    void codegen_for_statement(node* n);
 
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
