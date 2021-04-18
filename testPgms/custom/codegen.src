@@ -9,7 +9,7 @@ program LoopFib is
     begin
         temp1 := x1 * x2;
         tempBool1 := putFloat(temp1);
-        // return temp1;
+        return temp1;
     end procedure;
 begin
 

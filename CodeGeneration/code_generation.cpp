@@ -127,8 +127,9 @@ void code_generation::codegen_declaration_block(node *n, IRBuilder<>* b) {
 void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     for (node* x : n->children){
         if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
-        if (x->type == T_IF_BLOCK) codegen_if_statement(x);
-        if (x->type == T_FOR_LOOP) codegen_for_statement(x);
+        else if (x->type == T_IF_BLOCK) codegen_if_statement(x);
+        else if (x->type == T_FOR_LOOP) codegen_for_statement(x);
+        else if (x->type == T_RETURN_BLOCK) codegen_return_statement(x);
     }
 }
 
@@ -195,6 +196,11 @@ void code_generation::codegen_for_statement(node *n) {
 
     function->getBasicBlockList().push_back(continueBB);
     builder->SetInsertPoint(continueBB);
+}
+void code_generation::codegen_return_statement(node *n) {
+    n->children.pop_front(); // Popping return
+    builder->CreateRet(codegen_expression(n->children.front()));
+    n->children.pop_front(); // Popping return value
 }
 
 void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
@@ -312,7 +318,7 @@ Value *code_generation::codegen_function_body(node *n) {
     n->children.pop_front();
 
 //        identifiers.insert_or_assign("words", alloca);
-    builder->CreateRet(codegen_literal_float(6.9));
+
 
     builder->SetInsertPoint(currentBlock);
     return codegen_literal_integer(4);
@@ -669,6 +675,7 @@ Value *code_generation::generateValue(Module *m) {
 //    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
     return ConstantArray::get(arrayType, chars);
 }
+
 
 
 
