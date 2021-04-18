@@ -100,10 +100,10 @@ Module* code_generation::codegen_program_root(node *n) {
         namedValues.insert_or_assign(Arg.getName().str(), &Arg);
 
 
-    if (Value* returnVal = codegen_function_body(nullptr)){
+    if (true){
+        codegen_print_prototype(m); // Move this inside
         codegen_declaration_block(n->children.front(), builder);
 
-        codegen_print_prototype(m); // Move this inside
 
         n->children.pop_front(); // ignoring declaration block for now
         n->children.pop_front(); // Popping begin
@@ -121,6 +121,7 @@ Module* code_generation::codegen_program_root(node *n) {
 void code_generation::codegen_declaration_block(node *n, IRBuilder<>* b) {
     for (node* x : n->children){
         if (x->type == T_VARIABLE_DECLARATION) codegen_variable_declaration(x, b);
+        if (x->type == T_PROCEDURE_DECLARATION) codegen_function_body(x);
     }
 }
 void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
@@ -250,8 +251,55 @@ Function *code_generation::codegen_function(node *n, Module* m) {
 }
 
 Value *code_generation::codegen_function_body(node *n) {
-//    node* x = node::create_integer_literal_node(42);
-    return codegen_literal_integer(42);
+
+    n->children.pop_front(); // Popping procedure
+    std::string name = n->children.front()->val.stringValue;
+    n->children.pop_front(); // Popping name
+    n->children.pop_front(); // Popping :
+    n->children.pop_front(); // Popping return type
+    std::vector<std::string> args = {"x", "y"};
+
+
+
+
+    std::vector<Type *> Doubles(args.size(), Type::getDoubleTy(context));
+    FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), Doubles, false);
+
+//    Function* bounceback = builder->GetInsertBlock()->getParent();
+    Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
+
+    // Set names for all arguments.
+    unsigned Idx = 0;
+    for (auto &Arg : f->args())
+        Arg.setName(args[Idx++]);
+
+
+    functions.insert_or_assign(name, f);
+//    Function* f = getFunction(P.getName());
+
+    BasicBlock *BB = BasicBlock::Create(context, "entry", f);
+    BasicBlock* currentBlock = builder->GetInsertBlock();
+
+    builder->SetInsertPoint(BB);
+
+    namedValues.clear();
+    for (auto &Arg : f->args())
+        namedValues[std::string(Arg.getName())] = &Arg;
+
+    n->children.pop_front(); // Popping params
+    codegen_declaration_block(n->children.front(), builder);
+    n->children.pop_front(); // Popping declaration block
+    n->children.pop_front(); // Popping begin
+    codegen_statement_block(n->children.front(), builder);
+
+//    codegen_statement_block(n->children.front(), builder);
+    n->children.pop_front();
+
+//        identifiers.insert_or_assign("words", alloca);
+    builder->CreateRet(codegen_literal_float(6.9));
+
+    builder->SetInsertPoint(currentBlock);
+    return codegen_literal_integer(4);
 }
 
 Value *code_generation::codegen_literal_integer(int n) {
@@ -443,21 +491,25 @@ Value *code_generation::codegen_factor(node *n) {
         return builder->CreateLoad(identifiers.at(x->val.stringValue));
     }
     if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
-        if (string("putinteger") == x->children.front()->val.stringValue) {
-            x->children.pop_front();
+        const string functionName = x->children.front()->val.stringValue;
+        x->children.pop_front();
+        if (string("putinteger") == functionName) {
             return codegen_print_integer(m,codegen_expression(x->children.front()));
-        }  else if (string("putfloat") == x->children.front()->val.stringValue){
-            x->children.pop_front();
+        }  else if (string("putfloat") == functionName){
             return codegen_print_double(m,codegen_expression(x->children.front()));
-        }   else if (string("putstring") == x->children.front()->val.stringValue) {
-            x->children.pop_front();
+        }   else if (string("putstring") == functionName) {
             Value* tempStr = codegen_expression(x->children.front());
             AllocaInst* alloca = builder->CreateAlloca(tempStr->getType(), 0, "print_string_temp");
             builder->CreateStore(tempStr, alloca);
             return codegen_print_string(m, alloca);
-        }   else if (string("putboolean") == x->children.front()->val.stringValue) {
-            x->children.pop_front();
+        }   else if (string("putboolean") == functionName) {
             return codegen_print_boolean(m, codegen_expression(x->children.front()));
+        } else if (m->getFunction(functionName) != nullptr){
+            std::vector<Value *> args;
+
+            args.push_back(codegen_literal_float(2));
+            args.push_back(codegen_literal_float(5));
+            return builder->CreateCall(m->getFunction(functionName), args);
         }
     }
     if (x->type == T_FALSE)

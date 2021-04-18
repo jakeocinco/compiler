@@ -126,8 +126,6 @@ node* parser::parse_procedure() {
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
     expecting_reserved_word(T_SEMICOLON, ";");
-    std::cout << "\nPROCEDURE LEVEL | " << proc_name << "()" << endl;
-    this->current_table->print();
 
     pop_current_symbol_table();
     return n;

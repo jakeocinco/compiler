@@ -70,6 +70,8 @@ private:
     LLVMContext context;
     IRBuilder<>* builder;
     BasicBlock* block;
+
+    std::map<std::string, Function*> functions;
 //    ()(llvm::Value *, llvm::Value *, const llvm::Twine &, bool, bool
     typedef  Value* (llvm::IRBuilderBase::*memFn)(llvm::Value *, llvm::Value *, const llvm::Twine &);
 
@@ -100,8 +102,10 @@ private:
     void codegen_variable_declaration(node* n, IRBuilder<>* b);
     void codegen_variable_assignment(node* n, IRBuilder<>* b);
     Type* get_type(node *n);
+
     void codegen_if_statement(node* n);
     void codegen_for_statement(node* n);
+//    void
 
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
