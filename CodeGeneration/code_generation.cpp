@@ -257,13 +257,25 @@ Value *code_generation::codegen_function_body(node *n) {
     n->children.pop_front(); // Popping name
     n->children.pop_front(); // Popping :
     n->children.pop_front(); // Popping return type
-    std::vector<std::string> args = {"x", "y"};
+
+    std::vector<std::string> arg_names;
+    std::vector<Type *> arg_types;
+    for (auto arg : n->children.front()->children){
+        arg->children.pop_front(); // pop variable
+        arg_names.emplace_back(arg->children.front()->val.stringValue);
+        arg->children.pop_front(); // pop var name
+        arg->children.pop_front(); // pop :
+        arg_types.push_back(get_type(arg->children.front()));
+        arg->children.pop_front(); // pop type
+    }
 
 
+//    std::vector<Type *> params(args.size(), Type::getInt8PtrTy(context));
 
-
-    std::vector<Type *> Doubles(args.size(), Type::getDoubleTy(context));
-    FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), Doubles, false);
+//    params.push_back(Type::getInt32Ty(context));
+//    params.push_back(Type::getDoubleTy(context));
+//    std::vector<Type *> Doubles(args.size(), Type::getDoubleTy(context));
+    FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), arg_types, false);
 
 //    Function* bounceback = builder->GetInsertBlock()->getParent();
     Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
@@ -271,7 +283,7 @@ Value *code_generation::codegen_function_body(node *n) {
     // Set names for all arguments.
     unsigned Idx = 0;
     for (auto &Arg : f->args())
-        Arg.setName(args[Idx++]);
+        Arg.setName(arg_names[Idx++]);
 
 
     functions.insert_or_assign(name, f);
@@ -283,8 +295,12 @@ Value *code_generation::codegen_function_body(node *n) {
     builder->SetInsertPoint(BB);
 
     namedValues.clear();
-    for (auto &Arg : f->args())
+    for (auto &Arg : f->args()){
+//        Value* temp = &Arg;
+//        auto
+//        identifiers.insert_or_assign(std::string(Arg.getName()), )
         namedValues[std::string(Arg.getName())] = &Arg;
+    }
 
     n->children.pop_front(); // Popping params
     codegen_declaration_block(n->children.front(), builder);
@@ -488,7 +504,11 @@ Value *code_generation::codegen_factor(node *n) {
     if (x->type == T_FLOAT_LITERAL)
         return codegen_literal_float(x->val.doubleValue);
     if (x->type == T_IDENTIFIER) {
-        return builder->CreateLoad(identifiers.at(x->val.stringValue));
+        if (namedValues.contains(x->val.stringValue)){
+            return namedValues.at(x->val.stringValue);
+        } else if (identifiers.contains(x->val.stringValue)){
+            return builder->CreateLoad(identifiers.at(x->val.stringValue));
+        }
     }
     if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
         const string functionName = x->children.front()->val.stringValue;
@@ -507,8 +527,9 @@ Value *code_generation::codegen_factor(node *n) {
         } else if (m->getFunction(functionName) != nullptr){
             std::vector<Value *> args;
 
-            args.push_back(codegen_literal_float(2));
-            args.push_back(codegen_literal_float(5));
+            for (auto child : x->children){
+                args.push_back(codegen_expression(child));
+            }
             return builder->CreateCall(m->getFunction(functionName), args);
         }
     }

@@ -3,15 +3,15 @@ program LoopFib is
     variable val : integer;
     variable tempBool : bool;
     variable flipper : bool;
-    procedure getName : string(variable x1 : float, variable x2 : float)
+    procedure getName : string(variable x1 : integer, variable x2 : float)
         variable temp1 : float;
         variable tempBool1 : bool;
     begin
-        temp1 := 4.0 * 3.0;
+        temp1 := x1 * x2;
         tempBool1 := putFloat(temp1);
         // return temp1;
     end procedure;
 begin
 
-    tempBool := putFloat(getName(4.0, 3.0));
+    tempBool := putFloat(getName(2, getName(4, 6.0)));
 end program.
