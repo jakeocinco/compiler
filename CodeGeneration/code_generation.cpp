@@ -214,7 +214,7 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     n->children.pop_front();
     if (!n->children.empty()) {
         n->children.pop_front(); // [
-        int size = n->children.front()->val.intValue;
+        int size = cast<ConstantInt>(codegen_expression(n->children.front()))->getZExtValue();
         n->children.pop_front(); // size
         n->children.pop_front(); // ]
         type = ArrayType::get(type, size);
@@ -233,12 +233,12 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     if (n->children.front()->type == T_LBRACKET){
 
         n->children.pop_front();
-        int index = n->children.front()->val.intValue;
+        Value* index = codegen_expression(n->children.front());
         n->children.pop_front();
         n->children.pop_front();
+
         Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-        Value *i32one = ConstantInt::get(context, APInt(8, index));
-        Value *indices[2] = {i32zero, i32one};
+        Value *indices[2] = {i32zero, index};
         varInst = b->CreateGEP(varInst, ArrayRef<Value *>(indices, 2));
     }
     n->children.pop_front();
@@ -334,17 +334,8 @@ Value *code_generation::codegen_literal_boolean(bool n) {
     return ConstantInt::get(Type::getInt1Ty(context), APInt(1, n ? 1 : 0));
 }
 Value *code_generation::codegen_literal_string(const std::string&  n) {
-//    Constant* one = ConstantInt::get(Type::getInt32Ty(context), APInt(32, 1));
-//    Constant* two = ConstantInt::get(Type::getInt32Ty(context), APInt(32, 2));
-//
-//    Type* t = Type::getInt32Ty(context);
-//    ArrayType* at = ArrayType::get(t, 4);
-//    auto data = std::vector<Constant*>{one, two};
-////    ConstantArray::get
-////    Arr
-//
-//    return ConstantArray::get(at, data);
 
+    Value* v = codegen_literal_integer(4);
     auto ss = StringRef(n);
     auto string_val = ConstantDataArray::getString(context, ss, true);
 
@@ -530,11 +521,10 @@ Value *code_generation::codegen_factor(node *n) {
                 return builder->CreateLoad(identifiers.at(x->val.stringValue));
             }
         } else {
-            int index = n->children.front()->val.intValue;
+            Value* index = codegen_expression(n->children.front());
             AllocaInst* array_inst = identifiers.at(x->val.stringValue);
             Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-            Value *i32one = ConstantInt::get(context, APInt(8, index));
-            Value *indices[2] = {i32zero, i32one};
+            Value *indices[2] = {i32zero, index};
             auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
             return builder->CreateLoad(varInst);
         }

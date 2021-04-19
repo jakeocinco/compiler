@@ -433,7 +433,8 @@ node* parser::parse_factor(unsigned& code){
             n->newChild(expecting_identifier());
             if (current.type == T_LBRACKET){
                 expecting_reserved_word(T_LBRACKET, "[");
-                n->newChild(expecting_literal(T_INTEGER_LITERAL));
+                unsigned variable_val = 0;  // TODO Check if int
+                n->newChild(parse_expression(variable_val));
                 expecting_reserved_word(T_RBRACKET, "]");
             }
         }
@@ -473,7 +474,8 @@ node* parser::parse_variable_declaration() {
     push_new_identifier_to_symbol_table(identifier_name, type_to_literal(type_val));
     if (current.type == T_LBRACKET){
         n->newChild(expecting_reserved_word(T_LBRACKET, "["));
-        n->newChild(expecting_literal(T_INTEGER_LITERAL));
+        unsigned variable_val = 0; // TODO Check if int
+        n->newChild(parse_expression(variable_val));
         n->newChild(expecting_reserved_word(T_RBRACKET, "]"));
     }
 
@@ -488,7 +490,8 @@ node* parser::parse_variable_assignment() {
 
     if (T_LBRACKET == current.type){
         n->newChild(expecting_reserved_word(T_LBRACKET, "["));
-        n->newChild(expecting_literal(T_INTEGER_LITERAL));
+        unsigned variable_val = 0;  // TODO Check if int
+        n->newChild(parse_expression(variable_val));
         n->newChild(expecting_reserved_word(T_RBRACKET, "]"));
     }
     // Can stuff like this be stripped yet -- kinda like semi colons
