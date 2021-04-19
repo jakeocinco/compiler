@@ -40,7 +40,7 @@ scanner::_token scanner::get_next_token() {
             }
             /* String literal */
             if (regex_match (current, regex("(\")(.*)(\")") )){
-                return generate_string_literal_token(current, line_num);
+                return generate_string_literal_token(current.substr(1,current.length() - 2), line_num);
             }
             /* Integer literal */
             if (regex_match (current, regex("([0-9]*)") )){
@@ -212,6 +212,9 @@ string scanner::get_next_text() {
                 if (0 < s.length() && isdigit(s[s.length() - 1])){
                     doNotReturn = true;
                 }
+            }
+            if (s.length() > 0 && s.at(0) == '\"' && s.at(s.length() - 1) != '\"'){
+                doNotReturn = true;
             }
 
             // THIS CAN BE BETTER - check only symbol probably
