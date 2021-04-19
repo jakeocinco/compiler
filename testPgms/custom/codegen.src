@@ -3,8 +3,13 @@ program LoopFib is
     variable loop_val : integer;
     variable tempBool : bool;
 begin
-    //test_arr[0] := 1;
-    //tempBool := putInteger(test_arr[0]);
+    test_arr[0] := 1;
+    test_arr[1] := 2;
+    test_arr[2] := 4;
+    test_arr[3] := 16;
+    /*for (loop_val := 0; loop_val < 4)
+        tempBool := putInteger(test_arr[loop_val]);
+    end for;*/
     //for (loop_val := 0; loop_val < 4)
     //    tempBool := putInteger(test_arr[
 end program.

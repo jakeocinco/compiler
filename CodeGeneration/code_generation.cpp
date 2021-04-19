@@ -228,11 +228,23 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
+    Value* varInst = identifiers.at(s);
     n->children.pop_front();
+    if (n->children.front()->type == T_LBRACKET){
+
+        n->children.pop_front();
+        int index = n->children.front()->val.intValue;
+        n->children.pop_front();
+        n->children.pop_front();
+        Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+        Value *i32one = ConstantInt::get(context, APInt(8, index));
+        Value *indices[2] = {i32zero, i32one};
+        varInst = b->CreateGEP(varInst, ArrayRef<Value *>(indices, 2));
+    }
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
 
-    b->CreateStore(v, identifiers.at(s));
+    b->CreateStore(v, varInst);
 }
 
 Function *code_generation::codegen_function(node *n, Module* m) {
@@ -346,7 +358,8 @@ Value *code_generation::codegen_literal_string(const std::string&  n) {
 }
 
 Value *code_generation::codegen_literal_array(std::vector<Value*> values) {
-    return ConstantDataArray::get(context, values);
+    auto arr = ConstantDataArray::get(context, values);
+    return arr;
 }
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
@@ -504,16 +517,28 @@ Value *code_generation::codegen_term(node *n, Value* lhs) {
 }
 Value *code_generation::codegen_factor(node *n) {
     node* x = n->children.front();
+    n->children.pop_front();
     if (x->type == T_INTEGER_LITERAL)
         return codegen_literal_integer(x->val.intValue);
     if (x->type == T_FLOAT_LITERAL)
         return codegen_literal_float(x->val.doubleValue);
     if (x->type == T_IDENTIFIER) {
-        if (namedValues.contains(x->val.stringValue)){
-            return namedValues.at(x->val.stringValue);
-        } else if (identifiers.contains(x->val.stringValue)){
-            return builder->CreateLoad(identifiers.at(x->val.stringValue));
+        if (n->children.empty()){
+            if (namedValues.contains(x->val.stringValue)){
+                return namedValues.at(x->val.stringValue);
+            } else if (identifiers.contains(x->val.stringValue)){
+                return builder->CreateLoad(identifiers.at(x->val.stringValue));
+            }
+        } else {
+            int index = n->children.front()->val.intValue;
+            AllocaInst* array_inst = identifiers.at(x->val.stringValue);
+            Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+            Value *i32one = ConstantInt::get(context, APInt(8, index));
+            Value *indices[2] = {i32zero, i32one};
+            auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
+            return builder->CreateLoad(varInst);
         }
+
     }
     if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
         const string functionName = x->children.front()->val.stringValue;
