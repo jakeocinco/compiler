@@ -87,7 +87,6 @@ private:
 
     node* tree;
     std::map<std::string, AllocaInst*> identifiers;
-    std::map<std::string, bool> needs_reallocated;
 
     IRBuilder<>* b2;
     Value* codegen(node* n);
@@ -106,7 +105,6 @@ private:
     void codegen_if_statement(node* n);
     void codegen_for_statement(node* n);
     void codegen_return_statement(node* n);
-//    void
 
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
@@ -121,7 +119,7 @@ private:
 
     void codegen_print_prototype(Module *mod);
     Value* codegen_print_base(Module* mod, Value* v, Value* formatStr);
-    Value* codegen_print_string(Module* mod, AllocaInst* v);
+    Value* codegen_print_string(Module* mod, Value* v);
     Value* codegen_print_double(Module* mod, Value* v);
     Value* codegen_print_integer(Module* mod, Value* v);
     Value* codegen_print_boolean(Module* mod, Value* v);

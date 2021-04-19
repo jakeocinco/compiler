@@ -216,24 +216,14 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
     AllocaInst* alloca = builder->CreateAlloca(type, 0, s.c_str());
     identifiers.insert_or_assign(s, alloca);
-    needs_reallocated.insert_or_assign(s, code == T_STRING_TYPE);
-    //    builder.CreateStore()
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
     n->children.pop_front();
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
-    if (needs_reallocated.at(s)){
-        AllocaInst* alloca = builder->CreateAlloca(v->getType(), 0, s);
-        identifiers.insert_or_assign(s, alloca);
-        Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-        Value *i32one = ConstantInt::get(context, APInt(8, 0));
-        Value *indices[2] = {i32zero, i32one};
-//        v = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
-    }
+
     b->CreateStore(v, identifiers.at(s));
-//    builder.CreateAlloca(Type::getInt32Ty(context), v, s);
 }
 
 Function *code_generation::codegen_function(node *n, Module* m) {
@@ -275,15 +265,8 @@ Value *code_generation::codegen_function_body(node *n) {
         arg->children.pop_front(); // pop type
     }
 
-
-//    std::vector<Type *> params(args.size(), Type::getInt8PtrTy(context));
-
-//    params.push_back(Type::getInt32Ty(context));
-//    params.push_back(Type::getDoubleTy(context));
-//    std::vector<Type *> Doubles(args.size(), Type::getDoubleTy(context));
     FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), arg_types, false);
 
-//    Function* bounceback = builder->GetInsertBlock()->getParent();
     Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
 
     // Set names for all arguments.
@@ -293,7 +276,6 @@ Value *code_generation::codegen_function_body(node *n) {
 
 
     functions.insert_or_assign(name, f);
-//    Function* f = getFunction(P.getName());
 
     BasicBlock *BB = BasicBlock::Create(context, "entry", f);
     BasicBlock* currentBlock = builder->GetInsertBlock();
@@ -312,16 +294,13 @@ Value *code_generation::codegen_function_body(node *n) {
     codegen_declaration_block(n->children.front(), builder);
     n->children.pop_front(); // Popping declaration block
     n->children.pop_front(); // Popping begin
-    codegen_statement_block(n->children.front(), builder);
 
-//    codegen_statement_block(n->children.front(), builder);
+    codegen_statement_block(n->children.front(), builder);
     n->children.pop_front();
 
-//        identifiers.insert_or_assign("words", alloca);
-
-
     builder->SetInsertPoint(currentBlock);
-    return codegen_literal_integer(4);
+
+    return codegen_literal_integer(0);
 }
 
 Value *code_generation::codegen_literal_integer(int n) {
@@ -345,9 +324,16 @@ Value *code_generation::codegen_literal_string(const std::string&  n) {
 //
 //    return ConstantArray::get(at, data);
 
-
     auto ss = StringRef(n);
-    return ConstantDataArray::getString(context, ss, true);
+    auto string_val = ConstantDataArray::getString(context, ss, true);
+
+    AllocaInst* alloca = builder->CreateAlloca(string_val->getType(), 0, "temp_string_alloca");
+    builder->CreateStore(string_val, alloca);
+    Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+    Value *i32one = ConstantInt::get(context, APInt(8, 0));
+    Value *indices[2] = {i32zero, i32one};
+    auto ptr = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
+    return ptr;
 }
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
@@ -524,10 +510,7 @@ Value *code_generation::codegen_factor(node *n) {
         }  else if (string("putfloat") == functionName){
             return codegen_print_double(m,codegen_expression(x->children.front()));
         }   else if (string("putstring") == functionName) {
-            Value* tempStr = codegen_expression(x->children.front());
-            AllocaInst* alloca = builder->CreateAlloca(tempStr->getType(), 0, "print_string_temp");
-            builder->CreateStore(tempStr, alloca);
-            return codegen_print_string(m, alloca);
+            return codegen_print_string(m, codegen_expression(x->children.front()));
         }   else if (string("putboolean") == functionName) {
             return codegen_print_boolean(m, codegen_expression(x->children.front()));
         } else if (m->getFunction(functionName) != nullptr){
@@ -571,17 +554,12 @@ Value* code_generation::codegen_print_base(Module* mod, Value* v, Value* formatS
     builder->CreateCall(mod->getFunction("printf"), printArgs);
     return codegen_literal_boolean(true);
 }
-Value* code_generation::codegen_print_string(Module *mod, AllocaInst *v) {
+Value* code_generation::codegen_print_string(Module *mod, Value *v) {
     if (!namedValues.contains(".str")){
         Value *formatStr = builder->CreateGlobalStringPtr("%s\n", ".str");
         namedValues.insert_or_assign(".str", formatStr);
     }
-
-    Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-    Value *i32one = ConstantInt::get(context, APInt(8, 0));
-    Value *indices[2] = {i32zero, i32one};
-    auto ptr = builder->CreateGEP(v, ArrayRef<Value *>(indices, 2));
-    return codegen_print_base(mod,ptr, namedValues.at(".str"));
+    return codegen_print_base(mod,v, namedValues.at(".str"));
 }
 Value* code_generation::codegen_print_double(Module *mod, Value *v) {
     if (!namedValues.contains(".double")){
@@ -637,8 +615,7 @@ Type *code_generation::get_type(node *n) {
         case T_INTEGER_TYPE: return Type::getInt32Ty(context);
         case T_FLOAT_TYPE: return Type::getDoubleTy(context);
         case T_BOOL_TYPE: return Type::getInt1Ty(context);
-//        case T_STRING_TYPE: return Type::getInt8PtrTy(context);
-        case T_STRING_TYPE: return codegen_literal_string("")->getType();
+        case T_STRING_TYPE: return Type::getInt8PtrTy(context);
     }
     return nullptr;
 }
