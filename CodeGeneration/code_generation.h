@@ -51,8 +51,6 @@
 #include <utility>
 #include <vector>
 
-#define CALL_MEMBER_FN(object, ptrToMember)  ((object).*(ptrToMember))
-
 using namespace llvm;
 using namespace llvm::sys;
 
@@ -100,7 +98,9 @@ private:
 
     void codegen_variable_declaration(node* n, IRBuilder<>* b);
     void codegen_variable_assignment(node* n, IRBuilder<>* b);
+
     Type* get_type(node *n);
+    Type* get_array_type(node *n);
 
     void codegen_if_statement(node* n);
     void codegen_for_statement(node* n);
@@ -110,6 +110,8 @@ private:
     Value* codegen_literal_float(double n);
     Value* codegen_literal_boolean(bool n);
     Value* codegen_literal_string(const std::string& n);
+
+    Value* codegen_literal_array(std::vector<Value*> values);
 
     Value* codegen_expression(node *n, Value* lhs = nullptr);
     Value* codegen_arith_op(node *n, Value* lhs = nullptr);

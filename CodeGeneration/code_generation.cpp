@@ -211,11 +211,20 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
 
     Type* type = get_type(n->children.front());
-    const int code = n->children.front()->children.front()->type;
-    n->children.pop_front(); // type -- WILL be important
+    n->children.pop_front();
+    if (!n->children.empty()) {
+        n->children.pop_front(); // [
+        int size = n->children.front()->val.intValue;
+        n->children.pop_front(); // size
+        n->children.pop_front(); // ]
+        type = ArrayType::get(type, size);
+    }
+
 
     AllocaInst* alloca = builder->CreateAlloca(type, 0, s.c_str());
     identifiers.insert_or_assign(s, alloca);
+
+
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
@@ -332,8 +341,12 @@ Value *code_generation::codegen_literal_string(const std::string&  n) {
     Value *i32zero = ConstantInt::get(context, APInt(8, 0));
     Value *i32one = ConstantInt::get(context, APInt(8, 0));
     Value *indices[2] = {i32zero, i32one};
-    auto ptr = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
+    Value* ptr = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
     return ptr;
+}
+
+Value *code_generation::codegen_literal_array(std::vector<Value*> values) {
+    return ConstantDataArray::get(context, values);
 }
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
@@ -619,7 +632,9 @@ Type *code_generation::get_type(node *n) {
     }
     return nullptr;
 }
-
+Type *code_generation::get_array_type(node *n) {
+    return nullptr;
+}
 Value *code_generation::generateValue(Module *m) {
     //0. Defs
     auto str = string("Butt");
@@ -652,6 +667,8 @@ Value *code_generation::generateValue(Module *m) {
 //    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
     return ConstantArray::get(arrayType, chars);
 }
+
+
 
 
 

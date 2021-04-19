@@ -1,11 +1,10 @@
 program LoopFib is
-    variable loopVal : string;
+    variable test_arr : string[6];
+    variable loop_val : integer;
     variable tempBool : bool;
 begin
-    if ( true ) then
-        loopVal := "true";
-    else
-        loopVal := "false";
-    end if;
-    tempBool := putString(loopVal);
+    //test_arr[0] := 1;
+    //tempBool := putInteger(test_arr[0]);
+    //for (loop_val := 0; loop_val < 4)
+    //    tempBool := putInteger(test_arr[
 end program.
