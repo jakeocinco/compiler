@@ -538,8 +538,9 @@ Value *code_generation::codegen_factor(node *n) {
             return codegen_print_double(m,codegen_expression(x->children.front()));
         }   else if (string("putstring") == functionName) {
             return codegen_print_string(m, codegen_expression(x->children.front()));
-        }   else if (string("putboolean") == functionName) {
-            return codegen_print_boolean(m, codegen_expression(x->children.front()));
+        }   else if (string("putbool") == functionName) {
+            Value *v = codegen_expression(x->children.front());
+            return codegen_print_boolean(m, v);
         } else if (string("getinteger") == functionName){
             return codegen_scan_integer();
         } else if (string("getfloat") == functionName){
@@ -559,6 +560,8 @@ Value *code_generation::codegen_factor(node *n) {
 //            ConstantDataSequential* c = cast<ConstantDataSequential>(v);
 //            auto a = builder->CreateAlloca(ArrayType::get(Type::getInt8Ty(context),result->getNumElements()), 0, "size_test_string");
             return v;
+        } else if (string("getbool") == functionName){
+            return codegen_scan_bool();
         } else if (m->getFunction(functionName) != nullptr){
             std::vector<Value *> args;
 
@@ -758,6 +761,13 @@ Value *code_generation::codegen_scan_integer() {
         namedValues.insert_or_assign(".integer_sc", formatStr);
     }
     return codegen_scan_base(Type::getInt32Ty(context),namedValues.at(".integer_sc"));
+}
+Value *code_generation::codegen_scan_bool() {
+    if (!namedValues.contains(".integer_sc")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%u", ".integer_sc");
+        namedValues.insert_or_assign(".integer_sc", formatStr);
+    }
+    return codegen_scan_base(Type::getInt1Ty(context),namedValues.at(".integer_sc"));
 }
 
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,

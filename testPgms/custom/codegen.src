@@ -1,9 +1,8 @@
 program LoopFib is
     variable test : string;
     variable tempBool : bool;
+    variable i1 : integer;
+    variable i2 : integer;
 begin
-    test := getString();
-    tempBool := putString(test);
-    test := getString();
-    tempBool := putString(test);
+  tempBool := putBool(getBool());
 end program.

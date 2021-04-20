@@ -133,6 +133,7 @@ private:
     Value* codegen_scan_string();
     Value* codegen_scan_double();
     Value* codegen_scan_integer();
+    Value* codegen_scan_bool();
 
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, Value* rhs, bool is_comparison = false);
