@@ -1,7 +1,9 @@
 program LoopFib is
-    variable test_arr : string;
+    variable test : string;
     variable tempBool : bool;
 begin
-    test_arr := "test with a space";
-    tempBool := putString(test_arr);
+    test := getString();
+    tempBool := putString(test);
+    test := getString();
+    tempBool := putString(test);
 end program.

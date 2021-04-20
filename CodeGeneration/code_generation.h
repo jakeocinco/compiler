@@ -126,6 +126,14 @@ private:
     Value* codegen_print_integer(Module* mod, Value* v);
     Value* codegen_print_boolean(Module* mod, Value* v);
 
+    void codegen_scan_prototype();
+    void codegen_scan_string_prototype();
+    Value* codegen_scan_base(Type* t, Value* formatStr);
+
+    Value* codegen_scan_string();
+    Value* codegen_scan_double();
+    Value* codegen_scan_integer();
+
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, Value* rhs, bool is_comparison = false);
     Value* generateValue(Module* m);

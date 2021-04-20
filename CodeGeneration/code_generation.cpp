@@ -14,7 +14,6 @@ code_generation::code_generation(std::string file_text) {
     auto p = parser(file_text);
     this->tree = p.get_head();
 
-
     m = new Module("Program", context);
 
     auto TargetTriple = sys::getDefaultTargetTriple();
@@ -102,6 +101,7 @@ Module* code_generation::codegen_program_root(node *n) {
 
     if (true){
         codegen_print_prototype(m); // Move this inside
+        codegen_scan_prototype();
         codegen_declaration_block(n->children.front(), builder);
 
 
@@ -335,7 +335,6 @@ Value *code_generation::codegen_literal_boolean(bool n) {
 }
 Value *code_generation::codegen_literal_string(const std::string&  n) {
 
-    Value* v = codegen_literal_integer(4);
     auto ss = StringRef(n);
     auto string_val = ConstantDataArray::getString(context, ss, true);
 
@@ -541,6 +540,25 @@ Value *code_generation::codegen_factor(node *n) {
             return codegen_print_string(m, codegen_expression(x->children.front()));
         }   else if (string("putboolean") == functionName) {
             return codegen_print_boolean(m, codegen_expression(x->children.front()));
+        } else if (string("getinteger") == functionName){
+            return codegen_scan_integer();
+        } else if (string("getfloat") == functionName){
+            return codegen_scan_double();
+        } else if (string("getstring") == functionName){
+            Value* v = codegen_scan_string();
+//            v->print(llvm::outs());
+//            v->stripPointerCasts()->getType().pr
+//            for (int i = 0; i < 10; i++){
+//
+//                Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+//                Value *i32one = ConstantInt::get(context, APInt(8, 1));
+//                Value *indices[2] = {i32zero, i32one};
+//                Value* ptr = builder->CreateGEP(v, ArrayRef<Value *>(indices, 2));
+//                codegen_print_string(m, ptr);
+//            }
+//            ConstantDataSequential* c = cast<ConstantDataSequential>(v);
+//            auto a = builder->CreateAlloca(ArrayType::get(Type::getInt8Ty(context),result->getNumElements()), 0, "size_test_string");
+            return v;
         } else if (m->getFunction(functionName) != nullptr){
             std::vector<Value *> args;
 
@@ -573,7 +591,6 @@ void code_generation::codegen_print_prototype(Module *mod) {
     }
 }
 Value* code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr) {
-
     std::vector<Value *> printArgs;
 
     printArgs.push_back(formatStr);
@@ -612,6 +629,137 @@ Value* code_generation::codegen_print_boolean(Module *mod, Value *v) {
     // change integers to actually be ints ... maybe
     return codegen_print_base(mod, v, namedValues.at(".int"));
 }
+
+void code_generation::codegen_scan_prototype() {
+
+
+    Function* printer = m->getFunction("scanf");
+    if (printer == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getInt8PtrTy(context));
+
+        FunctionType *printfType = FunctionType::get(builder->getInt32Ty(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "scanf", m);
+    }
+
+    Function* malloc = m->getFunction("malloc");
+    if (malloc == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getInt32Ty(context));
+
+        FunctionType *printfType = FunctionType::get(builder->getInt8PtrTy(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "malloc", m);
+    }
+}
+void code_generation::codegen_scan_string_prototype() {
+
+    std::vector<std::string> arg_names = {"full_str", "size"};
+    std::string name = "shorten_string";
+
+    std::vector<Type *> arg_types = {
+            ArrayType::get(Type::getInt8Ty(context), 256),
+            Type::getInt32Ty(context)
+    };
+
+    FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), arg_types, false);
+
+    Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
+
+    // Set names for all arguments.
+    unsigned Idx = 0;
+    for (auto &Arg : f->args())
+        Arg.setName(arg_names[Idx++]);
+
+    functions.insert_or_assign(name, f);
+
+    BasicBlock *BB = BasicBlock::Create(context, "entry", f);
+    BasicBlock* currentBlock = builder->GetInsertBlock();
+
+    builder->SetInsertPoint(BB);
+
+    namedValues.clear();
+    for (auto &Arg : f->args()){
+//        Value* temp = &Arg;
+//        auto
+//        identifiers.insert_or_assign(std::string(Arg.getName()), )
+        namedValues[std::string(Arg.getName())] = &Arg;
+    }
+
+//    CallInst::CreateMa
+
+}
+Value *code_generation::codegen_scan_base(Type* t, Value *formatStr) {
+    AllocaInst* tempInst = builder->CreateAlloca(t, 0, "temp");
+    std::vector<Value *> printArgs;
+
+    printArgs.push_back(formatStr);
+    printArgs.push_back(tempInst);
+
+    builder->CreateCall(m->getFunction("scanf"), printArgs);
+    return builder->CreateLoad(tempInst);
+}
+Value *code_generation::codegen_scan_string() {
+    if (!namedValues.contains(".string_sc")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%[^\n]%n", ".string_sc");
+//        Value *formatStr = builder->CreateGlobalStringPtr("%n", ".string_sc");
+        namedValues.insert_or_assign(".string_sc", formatStr);
+    }
+    ArrayType* arrayType = ArrayType::get(Type::getInt8Ty(context), 256);
+    AllocaInst* tempInst = builder->CreateAlloca(arrayType, 0, "string_buffer");
+    AllocaInst* lengthInst = builder->CreateAlloca(Type::getInt32Ty(context), 0, "temp_string_size");
+
+    std::vector<Value *> printArgs;
+
+    printArgs.push_back(namedValues.at(".string_sc"));
+    printArgs.push_back(tempInst);
+    printArgs.push_back(lengthInst);
+
+    builder->CreateCall(m->getFunction("scanf"), printArgs);
+
+    std::vector<Value *> mallocArgs;
+    mallocArgs.push_back(builder->CreateMul(builder->CreateLoad(lengthInst), codegen_literal_integer(8)));
+    Value* string_malloc = builder->CreateCall(m->getFunction("malloc"), mallocArgs);
+
+
+//    string_len_value->print(llvm::outs());
+//    string_len_value->
+////    CastInst::
+//    int string_len = llvm::cast<llvm::ConstantInt>(codegen_literal_integer(6))->getZExtValue();
+//    ArrayType* rec_string_type = ArrayType::get(Type::getInt8Ty(context), string_len);
+//    AllocaInst* string_inst = builder->CreateAlloca(rec_string_type, 0, "temp_put_string");
+
+//    LoadInst* string_value = builder->(tempInst);
+//    builder->CreateLoad(Type::getInt32Ty(context), lengthInst);
+
+//    builder->CreateAllo
+
+    builder->CreateStore(tempInst, string_malloc);
+    Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+    Value *i32one = ConstantInt::get(context, APInt(8, 0));
+    Value *indices[2] = {i32zero, i32one};
+    Value* ptr = builder->CreateGEP(tempInst, ArrayRef<Value *>(indices, 2));
+
+//    builder->CreateStore(ptr, string_malloc);
+
+    codegen_print_integer(m,builder->CreateLoad(lengthInst));
+    return ptr;
+//    return codegen_scan_base(Type::getDoubleTy(context),namedValues.at(".string_sc"));
+}
+Value *code_generation::codegen_scan_double() {
+    if (!namedValues.contains(".double_sc")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%lf", ".double_sc");
+        namedValues.insert_or_assign(".double_sc", formatStr);
+    }
+    return codegen_scan_base(Type::getDoubleTy(context),namedValues.at(".double_sc"));
+}
+Value *code_generation::codegen_scan_integer() {
+    if (!namedValues.contains(".integer_sc")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%u", ".integer_sc");
+        namedValues.insert_or_assign(".integer_sc", formatStr);
+    }
+    return codegen_scan_base(Type::getInt32Ty(context),namedValues.at(".integer_sc"));
+}
+
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                                         Value* lhs, Value* rhs, bool is_comparison) {
     Type* lhs_type = nullptr;
@@ -682,6 +830,8 @@ Value *code_generation::generateValue(Module *m) {
 //    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
     return ConstantArray::get(arrayType, chars);
 }
+
+
 
 
 
