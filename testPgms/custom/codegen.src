@@ -4,5 +4,6 @@ program LoopFib is
     variable i1 : integer;
     variable i2 : integer;
 begin
-  tempBool := putBool(getBool());
+  tempBool := putBool(not true | not 4 < 2 & true);
+  tempBool := putBool(not false);
 end program.

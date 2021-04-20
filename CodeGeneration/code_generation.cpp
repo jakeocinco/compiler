@@ -354,22 +354,22 @@ Value *code_generation::codegen_literal_array(std::vector<Value*> values) {
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
 
-    if (n->children.empty())
-        return lhs;
+//    if (n->children.empty())
+//        return lhs;
 
     bool is_not_l = false;
-    if (n->children.front()->type == T_NOT){
+    if (!n->children.empty() && n->children.front()->type == T_NOT){
         n->children.pop_front();  // Pop not
         is_not_l = true;
     }
 
-    if (n->children.size() == 1)
-        return codegen_arith_op(n->children.front()); // flip if is_not_l
-
     if (lhs == nullptr){
-        lhs = codegen_arith_op(n->children.front());
+        lhs = is_not_l ? builder->CreateNot(codegen_arith_op(n->children.front())) : codegen_arith_op(n->children.front());
         n->children.pop_front();
     }
+
+    if (n->children.empty())
+        return lhs;
 
     int operation = n->children.front()->type;
     n->children.pop_front(); // Pop sign
@@ -379,15 +379,15 @@ Value *code_generation::codegen_expression(node *n,  Value* lhs) {
         n->children.pop_front(); // Pop not
         is_not_r = true;
     }
-    Value* rhs = codegen_arith_op(n->children.front());
+    Value* rhs = is_not_r ? builder->CreateNot(codegen_arith_op(n->children.front())) : codegen_arith_op(n->children.front());
     n->children.pop_front(); // Pop RHS
 
     // check flips
     switch (operation) {
         case T_AND:
-            return codegen_arith_op(n, builder->CreateAnd(lhs, rhs, "andtmp"));
+            return codegen_expression(n, builder->CreateAnd(lhs, rhs, "andtmp"));
         case T_OR:
-            return codegen_arith_op(n, builder->CreateOr(lhs, rhs, "ortmp"));
+            return codegen_expression(n, builder->CreateOr(lhs, rhs, "ortmp"));
         default:
             cout << "Error" << endl;
     }
