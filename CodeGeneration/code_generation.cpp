@@ -354,9 +354,6 @@ Value *code_generation::codegen_literal_array(std::vector<Value*> values) {
 
 Value *code_generation::codegen_expression(node *n,  Value* lhs) {
 
-//    if (n->children.empty())
-//        return lhs;
-
     bool is_not_l = false;
     if (!n->children.empty() && n->children.front()->type == T_NOT){
         n->children.pop_front();  // Pop not
@@ -506,18 +503,27 @@ Value *code_generation::codegen_term(node *n, Value* lhs) {
     return nullptr;
 }
 Value *code_generation::codegen_factor(node *n) {
+
     node* x = n->children.front();
     n->children.pop_front();
-    if (x->type == T_INTEGER_LITERAL)
-        return codegen_literal_integer(x->val.intValue);
-    if (x->type == T_FLOAT_LITERAL)
-        return codegen_literal_float(x->val.doubleValue);
+
+    bool is_neg = false;
+    Value* return_val = nullptr;
+
+    if (x->type == T_MINUS) {
+        is_neg = true;
+        x = n->children.front();
+        n->children.pop_front();
+    }
+
+    if (x->type == T_INTEGER_LITERAL) return_val = codegen_literal_integer(x->val.intValue);
+    if (x->type == T_FLOAT_LITERAL) return_val = codegen_literal_float(x->val.doubleValue);
     if (x->type == T_IDENTIFIER) {
         if (n->children.empty()){
             if (namedValues.contains(x->val.stringValue)){
-                return namedValues.at(x->val.stringValue);
+                return_val = namedValues.at(x->val.stringValue);
             } else if (identifiers.contains(x->val.stringValue)){
-                return builder->CreateLoad(identifiers.at(x->val.stringValue));
+                return_val = builder->CreateLoad(identifiers.at(x->val.stringValue));
             }
         } else {
             Value* index = codegen_expression(n->children.front());
@@ -525,7 +531,7 @@ Value *code_generation::codegen_factor(node *n) {
             Value *i32zero = ConstantInt::get(context, APInt(8, 0));
             Value *indices[2] = {i32zero, index};
             auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
-            return builder->CreateLoad(varInst);
+            return_val = builder->CreateLoad(varInst);
         }
 
     }
@@ -533,51 +539,37 @@ Value *code_generation::codegen_factor(node *n) {
         const string functionName = x->children.front()->val.stringValue;
         x->children.pop_front();
         if (string("putinteger") == functionName) {
-            return codegen_print_integer(m,codegen_expression(x->children.front()));
+            return_val = codegen_print_integer(m,codegen_expression(x->children.front()));
         }  else if (string("putfloat") == functionName){
-            return codegen_print_double(m,codegen_expression(x->children.front()));
+            return_val = codegen_print_double(m,codegen_expression(x->children.front()));
         }   else if (string("putstring") == functionName) {
-            return codegen_print_string(m, codegen_expression(x->children.front()));
+            return_val = codegen_print_string(m, codegen_expression(x->children.front()));
         }   else if (string("putbool") == functionName) {
             Value *v = codegen_expression(x->children.front());
-            return codegen_print_boolean(m, v);
+            return_val = codegen_print_boolean(m, v);
         } else if (string("getinteger") == functionName){
-            return codegen_scan_integer();
+            return_val = codegen_scan_integer();
         } else if (string("getfloat") == functionName){
-            return codegen_scan_double();
+            return_val = codegen_scan_double();
         } else if (string("getstring") == functionName){
             Value* v = codegen_scan_string();
-//            v->print(llvm::outs());
-//            v->stripPointerCasts()->getType().pr
-//            for (int i = 0; i < 10; i++){
-//
-//                Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-//                Value *i32one = ConstantInt::get(context, APInt(8, 1));
-//                Value *indices[2] = {i32zero, i32one};
-//                Value* ptr = builder->CreateGEP(v, ArrayRef<Value *>(indices, 2));
-//                codegen_print_string(m, ptr);
-//            }
-//            ConstantDataSequential* c = cast<ConstantDataSequential>(v);
-//            auto a = builder->CreateAlloca(ArrayType::get(Type::getInt8Ty(context),result->getNumElements()), 0, "size_test_string");
-            return v;
+            return_val =  v;
         } else if (string("getbool") == functionName){
-            return codegen_scan_bool();
+            return_val = codegen_scan_bool();
         } else if (m->getFunction(functionName) != nullptr){
             std::vector<Value *> args;
 
             for (auto child : x->children){
                 args.push_back(codegen_expression(child));
             }
-            return builder->CreateCall(m->getFunction(functionName), args);
+            return_val = builder->CreateCall(m->getFunction(functionName), args);
         }
     }
-    if (x->type == T_FALSE)
-        return codegen_literal_boolean(false);
-    if (x->type == T_TRUE)
-        return codegen_literal_boolean(true);
-    if (x->type == T_STRING_LITERAL)
-        return codegen_literal_string(x->val.stringValue);
-    return nullptr;
+    if (x->type == T_FALSE) return_val = codegen_literal_boolean(false);
+    if (x->type == T_TRUE) return_val = codegen_literal_boolean(true);
+    if (x->type == T_STRING_LITERAL) return_val = codegen_literal_string(x->val.stringValue);
+
+    return is_neg ? builder->CreateNeg(return_val) : return_val;
 }
 
 void code_generation::codegen_print_prototype(Module *mod) {

@@ -427,7 +427,7 @@ node* parser::parse_factor(unsigned& code){
     if (current.type == T_IDENTIFIER){
         code = verify_identifier_is_declared(current.val.stringValue);
 
-        if (next.type == T_LPAREN && !isNegative){
+        if (next.type == T_LPAREN){
             n->newChild(parse_procedure_call());
         } else {
             n->newChild(expecting_identifier());
