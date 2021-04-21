@@ -204,6 +204,12 @@ void code_generation::codegen_return_statement(node *n) {
 }
 
 void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
+    bool is_global = false;
+    if (n->children.front()->type == T_GLOBAL) {
+        is_global = true;
+        n->children.pop_front(); // global
+    }
+
     n->children.pop_front(); // variable
     string s = n->children.front()->val.stringValue;
     n->children.pop_front(); // variable name
@@ -220,9 +226,19 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
         type = ArrayType::get(type, size);
     }
 
+    Value* variable_ptr;
+    if (is_global) {
+        variable_ptr = new GlobalVariable(*m,
+                                 type,
+                                 true,
+                                 llvm::GlobalValue::CommonLinkage,
+                                 Constant::getNullValue(type),
+                                 s);
+    } else {
+        variable_ptr = builder->CreateAlloca(type, 0, s.c_str());
+    }
+    identifiers.insert_or_assign(s, variable_ptr);
 
-    AllocaInst* alloca = builder->CreateAlloca(type, 0, s.c_str());
-    identifiers.insert_or_assign(s, alloca);
 
 
 }
@@ -527,7 +543,7 @@ Value *code_generation::codegen_factor(node *n) {
             }
         } else {
             Value* index = codegen_expression(n->children.front());
-            AllocaInst* array_inst = identifiers.at(x->val.stringValue);
+            Value* array_inst = identifiers.at(x->val.stringValue);
             Value *i32zero = ConstantInt::get(context, APInt(8, 0));
             Value *indices[2] = {i32zero, index};
             auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));

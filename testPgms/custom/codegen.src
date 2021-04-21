@@ -1,9 +1,14 @@
 program LoopFib is
-    variable test : string;
+    global variable test : integer;
+    global variable test2 : float;
     variable tempBool : bool;
     variable i1 : integer;
     variable i2 : integer;
 begin
   i1 := - getInteger();
   tempBool := putInteger(i1);
+  test := 52452;
+  tempBool := putInteger(test);
+  test2 := 233.3245;
+  tempBool := putFloat(test2);
 end program.

@@ -84,7 +84,7 @@ private:
     void write_to_file(Module* m);
 
     node* tree;
-    std::map<std::string, AllocaInst*> identifiers;
+    std::map<std::string,Value*> identifiers;
 
     IRBuilder<>* b2;
     Value* codegen(node* n);
