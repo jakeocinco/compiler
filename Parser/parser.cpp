@@ -61,7 +61,7 @@ node* parser::parse_program_declaration_block() {
         std::list<std::function<bool()>> functionList;
 
         functionList.emplace_back([this, n] { return process_block_comments(n); });
-        functionList.emplace_back([this, n] { return process_variable_declaration(n); });
+        functionList.emplace_back([this, n] { return process_variable_declaration(n, true); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
 
         run_processes_until_true(n, functionList);
@@ -182,7 +182,7 @@ node* parser::parse_procedure_parameter_list(){
         } else {
             expecting_reserved_word(T_COMMA, ",");
         }
-        n->newChild(parse_variable_declaration());
+        n->newChild(parse_variable_declaration(false));
     }
 
     expecting_reserved_word(T_RPAREN, ")");
@@ -457,12 +457,15 @@ node* parser::parse_factor(unsigned& code){
 }
 
 /** Variables **/
-node* parser::parse_variable_declaration() {
+node* parser::parse_variable_declaration(bool is_global) {
     /** TODO: ADD TO TABLE **/
     node* n = new node(T_VARIABLE_DECLARATION);
 
     if (current.type == T_GLOBAL)
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
+    else if (is_global)
+        n->newChild(node::create_identifier_literal_node("global", T_GLOBAL));
+
 
     n->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
     const string identifier_name = current.val.stringValue;
@@ -639,9 +642,9 @@ bool parser::process_block_comments(node* n) {
     }
     return false;
 }
-bool parser::process_variable_declaration(node* n) {
+bool parser::process_variable_declaration(node* n, bool is_global) {
     if (current.type == T_VARIABLE || (current.type == T_GLOBAL && next.type == T_VARIABLE)){
-        n->newChild(parse_variable_declaration());
+        n->newChild(parse_variable_declaration(is_global));
         expecting_reserved_word(T_SEMICOLON, ";");
         return true;
     }

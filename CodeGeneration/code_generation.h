@@ -85,6 +85,7 @@ private:
 
     node* tree;
     std::map<std::string,Value*> identifiers;
+    std::map<std::string,Type*> identifier_types;
 
     IRBuilder<>* b2;
     Value* codegen(node* n);

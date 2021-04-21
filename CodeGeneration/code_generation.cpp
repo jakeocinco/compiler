@@ -237,14 +237,15 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     } else {
         variable_ptr = builder->CreateAlloca(type, 0, s.c_str());
     }
+
     identifiers.insert_or_assign(s, variable_ptr);
-
-
+    identifier_types.insert_or_assign(s, type);
 
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
     Value* varInst = identifiers.at(s);
+
     n->children.pop_front();
     if (n->children.front()->type == T_LBRACKET){
 
@@ -259,7 +260,10 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     }
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
-
+    if (identifier_types.at(s) != v->getType()){
+        if (identifier_types.at(s) == Type::getDoubleTy(context) && v->getType() == Type::getInt32Ty(context))
+            v = builder->CreateSIToFP(v, identifier_types.at(s));
+    }
     b->CreateStore(v, varInst);
 }
 
@@ -289,6 +293,7 @@ Value *code_generation::codegen_function_body(node *n) {
     std::string name = n->children.front()->val.stringValue;
     n->children.pop_front(); // Popping name
     n->children.pop_front(); // Popping :
+    Type* return_type = get_type(n->children.front());
     n->children.pop_front(); // Popping return type
 
     std::vector<std::string> arg_names;
@@ -302,7 +307,7 @@ Value *code_generation::codegen_function_body(node *n) {
         arg->children.pop_front(); // pop type
     }
 
-    FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), arg_types, false);
+    FunctionType *FT = FunctionType::get(return_type, arg_types, false);
 
     Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
 

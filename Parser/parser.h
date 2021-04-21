@@ -52,7 +52,7 @@ private:
     node* parse_factor(unsigned& code);
 
     /** Variables **/
-    node* parse_variable_declaration();
+    node* parse_variable_declaration(bool is_global);
     node* parse_variable_assignment();
 
     /** Types **/
@@ -74,7 +74,7 @@ private:
 
     /** Processors **/
     bool process_block_comments(node* n);
-    bool process_variable_declaration(node* n);
+    bool process_variable_declaration(node* n, bool is_global = false);
     bool process_variable_assignment(node* n);
     bool process_procedure_declaration(node* n);
     bool process_if_block(node* n);
