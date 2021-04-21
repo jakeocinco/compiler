@@ -292,6 +292,8 @@ Function *code_generation::codegen_function(node *n, Module* m) {
 
 Value *code_generation::codegen_function_body(node *n) {
 
+    variable_scope = new scope(variable_scope);
+
     n->children.pop_front(); // Popping procedure
     std::string name = n->children.front()->val.stringValue;
     n->children.pop_front(); // Popping name
@@ -332,7 +334,8 @@ Value *code_generation::codegen_function_body(node *n) {
 //        Value* temp = &Arg;
 //        auto
 //        identifiers.insert_or_assign(std::string(Arg.getName()), )
-        namedValues[std::string(Arg.getName())] = &Arg;
+//        namedValues[std::string(Arg.getName())] = &Arg;
+        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), builder, false);
     }
 
     n->children.pop_front(); // Popping params
@@ -345,6 +348,7 @@ Value *code_generation::codegen_function_body(node *n) {
 
     builder->SetInsertPoint(currentBlock);
 
+    variable_scope = variable_scope->get_parent();
     return codegen_literal_integer(0);
 }
 

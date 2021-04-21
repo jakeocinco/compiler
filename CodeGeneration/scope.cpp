@@ -33,5 +33,9 @@ void scope::set(std::string s, llvm::Value *v) {
     vi->set(v);
 }
 
+scope* scope::get_parent(){
+    return parent;
+}
+
 
 

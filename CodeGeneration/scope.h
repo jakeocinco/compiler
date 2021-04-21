@@ -32,6 +32,8 @@ public:
 
     variable_inst* get_temp(std::string s);
     void set(std::string s, llvm::Value* v);
+
+    scope* get_parent();
 };
 
 

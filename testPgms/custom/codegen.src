@@ -1,7 +1,13 @@
 program LoopFib is
     variable i : integer;
     variable tempBool : bool;
+    procedure Sub : integer(variable val1 : integer)
+        variable xx : integer;
+    begin
+        xx :=  - val1;
+        return xx;
+    end procedure;
 begin
     i := getInteger();
-    tempBool := putInteger(-i);
+    tempBool := putInteger(Sub(i));
 end program.
