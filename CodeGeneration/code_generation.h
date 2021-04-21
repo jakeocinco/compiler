@@ -11,12 +11,13 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LegacyPassManager.h"
 //#include "llvm/IR/PassManager.h"
 //#include "llvm/IR/CallingConv.h"
 //#include "llvm/IR/Verifier.h"
 //#include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LegacyPassManager.h"
+
 //#include "llvm/Bitcode/BitcodeWriter.h"
 //#include "llvm/ADT/APFloat.h"
 //#include "llvm/ADT/Optional.h"
@@ -39,6 +40,7 @@
 #include "llvm/Target/TargetOptions.h"
 
 #include "../Parser/node.h"
+#include "scope.h"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -84,6 +86,8 @@ private:
     void write_to_file(Module* m);
 
     node* tree;
+    scope* variable_scope;
+
     std::map<std::string,Value*> identifiers;
     std::map<std::string,Type*> identifier_types;
 

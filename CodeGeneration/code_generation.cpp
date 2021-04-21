@@ -8,7 +8,7 @@
 #include "../tokenCodes.h"
 
 //Value *NumberExprAST::codegen() {
-//    return ConstantFP::get(TheContext, APFloat(Val));
+//    return ConstantFP::get_temp(TheContext, APFloat(Val));
 //}
 code_generation::code_generation(std::string file_text) {
     auto p = parser(file_text);
@@ -85,6 +85,7 @@ Module* code_generation::codegen_program_root(node *n) {
     n->children.pop_front(); // Popping program name
     n->children.pop_front(); // Popping is
 
+    variable_scope = new scope();
 
     Function* f = m->getFunction("mul");
     if (!f)
@@ -238,13 +239,14 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
         variable_ptr = builder->CreateAlloca(type, 0, s.c_str());
     }
 
-    identifiers.insert_or_assign(s, variable_ptr);
-    identifier_types.insert_or_assign(s, type);
+//    identifiers.insert_or_assign(s, variable_ptr);
+//    identifier_types.insert_or_assign(s, type);
+    variable_scope->add(s, variable_ptr, type, builder, true);
 
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
-    Value* varInst = identifiers.at(s);
+//    Value* varInst = identifiers.at(s);
 
     n->children.pop_front();
     if (n->children.front()->type == T_LBRACKET){
@@ -256,15 +258,16 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
 
         Value *i32zero = ConstantInt::get(context, APInt(8, 0));
         Value *indices[2] = {i32zero, index};
-        varInst = b->CreateGEP(varInst, ArrayRef<Value *>(indices, 2));
+//        varInst = b->CreateGEP(varInst, ArrayRef<Value *>(indices, 2));
     }
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
-    if (identifier_types.at(s) != v->getType()){
-        if (identifier_types.at(s) == Type::getDoubleTy(context) && v->getType() == Type::getInt32Ty(context))
-            v = builder->CreateSIToFP(v, identifier_types.at(s));
-    }
-    b->CreateStore(v, varInst);
+//    if (identifier_types.at(s) != v->getType()){
+//        if (identifier_types.at(s) == Type::getDoubleTy(context) && v->getType() == Type::getInt32Ty(context))
+//            v = builder->CreateSIToFP(v, identifier_types.at(s));
+//    }
+//    b->CreateStore(v, varInst);
+    variable_scope->set(s, v);
 }
 
 Function *code_generation::codegen_function(node *n, Module* m) {
@@ -540,20 +543,21 @@ Value *code_generation::codegen_factor(node *n) {
     if (x->type == T_INTEGER_LITERAL) return_val = codegen_literal_integer(x->val.intValue);
     if (x->type == T_FLOAT_LITERAL) return_val = codegen_literal_float(x->val.doubleValue);
     if (x->type == T_IDENTIFIER) {
-        if (n->children.empty()){
-            if (namedValues.contains(x->val.stringValue)){
-                return_val = namedValues.at(x->val.stringValue);
-            } else if (identifiers.contains(x->val.stringValue)){
-                return_val = builder->CreateLoad(identifiers.at(x->val.stringValue));
-            }
-        } else {
-            Value* index = codegen_expression(n->children.front());
-            Value* array_inst = identifiers.at(x->val.stringValue);
-            Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-            Value *indices[2] = {i32zero, index};
-            auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
-            return_val = builder->CreateLoad(varInst);
-        }
+        return_val = variable_scope->get_temp(x->val.stringValue)->get();
+//        if (n->children.empty()){
+//            if (namedValues.contains(x->val.stringValue)){
+//                return_val = namedValues.at(x->val.stringValue);
+//            } else if (identifiers.contains(x->val.stringValue)){
+//                return_val = builder->CreateLoad(identifiers.at(x->val.stringValue));
+//            }
+//        } else {
+//            Value* index = codegen_expression(n->children.front());
+//            Value* array_inst = identifiers.at(x->val.stringValue);
+//            Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+//            Value *indices[2] = {i32zero, index};
+//            auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
+//            return_val = builder->CreateLoad(varInst);
+//        }
 
     }
     if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
@@ -741,7 +745,7 @@ Value *code_generation::codegen_scan_string() {
 //    string_len_value->
 ////    CastInst::
 //    int string_len = llvm::cast<llvm::ConstantInt>(codegen_literal_integer(6))->getZExtValue();
-//    ArrayType* rec_string_type = ArrayType::get(Type::getInt8Ty(context), string_len);
+//    ArrayType* rec_string_type = ArrayType::get_temp(Type::getInt8Ty(context), string_len);
 //    AllocaInst* string_inst = builder->CreateAlloca(rec_string_type, 0, "temp_put_string");
 
 //    LoadInst* string_value = builder->(tempInst);
@@ -842,7 +846,7 @@ Value *code_generation::generateValue(Module *m) {
 
     //3. Create the declaration statement
     auto globalDeclaration = (llvm::GlobalVariable*) m->getOrInsertGlobal(".str", stringType);
-//    globalDeclaration->setInitializer(llvm::ConstantArray::get(stringType, chars));
+//    globalDeclaration->setInitializer(llvm::ConstantArray::get_temp(stringType, chars));
 //    globalDeclaration->setConstant(true);
 //    globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
 //    globalDeclaration->setUnnamedAddr (llvm::GlobalValue::UnnamedAddr::Global);
