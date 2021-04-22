@@ -1,21 +1,16 @@
 program LoopFib is
-    global variable test : integer;
-    global variable test2 : float;
-    variable tempBool : bool;
-    variable i1 : integer;
+    variable i : integer[3];
     variable i2 : integer;
-    procedure tester : float(variable val : integer)
-        variable sq : float;
-        global variable pussy_shit : float;
-        begin
-            if (val == 1) then
-                sq := 1;
-            else
-                sq := val * tester(val - 1);
-            end if;
-            return sq;
+    variable tempBool : bool;
+    procedure Sub : integer(variable val1 : integer)
+        variable i : integer;
+    begin
+        i :=  - val1;
+        return i;
     end procedure;
 begin
-  i1 := getInteger();
-  tempBool := putFloat(tester(i1));
+    i[1] := getInteger();
+    tempBool := putInteger(- i[1]);
+    i2 := 23142;
+    tempBool := putInteger(Sub(i2));
 end program.
