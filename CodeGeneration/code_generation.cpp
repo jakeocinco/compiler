@@ -105,19 +105,6 @@ Module* code_generation::codegen_program_root(node *n) {
         codegen_scan_prototype();
         codegen_declaration_block(n->children.front(), builder);
 
-//        auto ss = StringRef("shit");
-//        auto string_val = ConstantDataArray::getString(context, ss, true);
-//
-//        AllocaInst* alloca = builder->CreateAlloca(string_val->getType(), 0, "temp_string_alloca");
-//        builder->CreateStore(string_val, alloca);
-//        Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-//        Value *i32one = ConstantInt::get(context, APInt(8, 0));
-//        Value *indices[2] = {i32zero, i32one};
-//        Value* ptr = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
-//        ptr->
-//        Value* vv = builder->CreateLoad(ptr);
-//        codegen_print_string(m, vv);
-
         n->children.pop_front(); // ignoring declaration block for now
         n->children.pop_front(); // Popping begin
 
@@ -252,10 +239,11 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     }
 
     Value* variable_ptr;
-    if (is_global && false) {
+    if (is_global) {
+
         variable_ptr = new GlobalVariable(*m,
                                  type,
-                                 true,
+                                 false,
                                  llvm::GlobalValue::CommonLinkage,
                                  Constant::getNullValue(type),
                                  s);
