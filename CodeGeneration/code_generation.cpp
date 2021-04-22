@@ -104,8 +104,40 @@ Module* code_generation::codegen_program_root(node *n) {
         codegen_print_prototype(m); // Move this inside
         codegen_scan_prototype();
         codegen_declaration_block(n->children.front(), builder);
-
-
+//        /** **/
+////        string s = "var";
+////        Value* size = codegen_literal_integer(3);
+////        Type* type = Type::getInt32Ty(context);
+////        Value* variable_ptr = builder->CreateAlloca(type, size, s.c_str());
+//////        builder->CreateSt/
+////        llvm::Value *i32zero = llvm::ConstantInt::get(context, llvm::APInt(32, 0));
+////        llvm::Value *i32one = llvm::ConstantInt::get(context, llvm::APInt(32, 0));
+////        llvm::Value *indices[2] = {i32zero, i32one};
+////
+////
+//////        llvm::Value* varInst = builder->CreateGEP(type, variable_ptr, i32one);
+////        llvm::Value* varInst = builder->CreateGEP(variable_ptr, i32one);
+////        llvm::Value* varInst = builder->CreateGEP(variable_ptr, llvm::ArrayRef<llvm::Value *>(indices, 2));
+//
+////        codegen_print_integer()
+//        string str = "AA";
+//        string s2 = "var_str";
+//        Type* type = Type::getInt8Ty(context);
+//        Value* variable_ptr = builder->CreateAlloca(type, codegen_literal_integer(str.length() + 1),s2);
+//
+//        llvm::Value *i32zero = llvm::ConstantInt::get(context, llvm::APInt(32, 0));
+//        llvm::Value *i32one = llvm::ConstantInt::get(context, llvm::APInt(32, 1));
+//        llvm::Value *i32two = llvm::ConstantInt::get(context, llvm::APInt(32, 2));
+//
+//        llvm::Value* varInst = builder->CreateGEP(variable_ptr, i32zero);
+//        builder->CreateStore(ConstantInt::get(Type::getInt8Ty(context), APInt(8, 65)),varInst);
+//        varInst = builder->CreateGEP(variable_ptr, i32one);
+//        builder->CreateStore(ConstantInt::get(Type::getInt8Ty(context), APInt(8, 65)),varInst);
+//        varInst = builder->CreateGEP(variable_ptr, i32two);
+//        builder->CreateStore(ConstantInt::get(Type::getInt8Ty(context), APInt(8, 0)),varInst);
+//
+//        codegen_print_string(m,builder->CreateGEP(variable_ptr, i32zero));
+//        /** **/
         n->children.pop_front(); // ignoring declaration block for now
         n->children.pop_front(); // Popping begin
 
@@ -553,10 +585,6 @@ Value *code_generation::codegen_factor(node *n) {
             Value* index = codegen_expression(n->children.front());
 
             return_val = variable_scope->get_temp(x->val.stringValue)->get(index);
-//            Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-//            Value *indices[2] = {i32zero, index};
-//            auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
-//            return_val = builder->CreateLoad(varInst);
         }
     }
     else if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
@@ -662,13 +690,12 @@ void code_generation::codegen_scan_prototype() {
         Function::Create(printfType, Function::ExternalLinkage, "scanf", m);
     }
 
-    Function* malloc = m->getFunction("malloc");
-    if (malloc == nullptr){
+    Function* scanString = m->getFunction("scanString");
+    if (scanString == nullptr){
         std::vector<Type *> args;
-        args.push_back(Type::getInt32Ty(context));
 
         FunctionType *printfType = FunctionType::get(builder->getInt8PtrTy(), args, true);
-        Function::Create(printfType, Function::ExternalLinkage, "malloc", m);
+        Function::Create(printfType, Function::ExternalLinkage, "scanString", m);
     }
 }
 void code_generation::codegen_scan_string_prototype() {
@@ -719,51 +746,9 @@ Value *code_generation::codegen_scan_base(Type* t, Value *formatStr) {
     return builder->CreateLoad(tempInst);
 }
 Value *code_generation::codegen_scan_string() {
-    if (!namedValues.contains(".string_sc")){
-        Value *formatStr = builder->CreateGlobalStringPtr("%[^\n]%n", ".string_sc");
-//        Value *formatStr = builder->CreateGlobalStringPtr("%n", ".string_sc");
-        namedValues.insert_or_assign(".string_sc", formatStr);
-    }
-    ArrayType* arrayType = ArrayType::get(Type::getInt8Ty(context), 256);
-    AllocaInst* tempInst = builder->CreateAlloca(arrayType, 0, "string_buffer");
-    AllocaInst* lengthInst = builder->CreateAlloca(Type::getInt32Ty(context), 0, "temp_string_size");
 
     std::vector<Value *> printArgs;
-
-    printArgs.push_back(namedValues.at(".string_sc"));
-    printArgs.push_back(tempInst);
-    printArgs.push_back(lengthInst);
-
-    builder->CreateCall(m->getFunction("scanf"), printArgs);
-
-    std::vector<Value *> mallocArgs;
-    mallocArgs.push_back(builder->CreateMul(builder->CreateLoad(lengthInst), codegen_literal_integer(8)));
-    Value* string_malloc = builder->CreateCall(m->getFunction("malloc"), mallocArgs);
-
-
-//    string_len_value->print(llvm::outs());
-//    string_len_value->
-////    CastInst::
-//    int string_len = llvm::cast<llvm::ConstantInt>(codegen_literal_integer(6))->getZExtValue();
-//    ArrayType* rec_string_type = ArrayType::get_temp(Type::getInt8Ty(context), string_len);
-//    AllocaInst* string_inst = builder->CreateAlloca(rec_string_type, 0, "temp_put_string");
-
-//    LoadInst* string_value = builder->(tempInst);
-//    builder->CreateLoad(Type::getInt32Ty(context), lengthInst);
-
-//    builder->CreateAllo
-
-    builder->CreateStore(tempInst, string_malloc);
-    Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-    Value *i32one = ConstantInt::get(context, APInt(8, 0));
-    Value *indices[2] = {i32zero, i32one};
-    Value* ptr = builder->CreateGEP(tempInst, ArrayRef<Value *>(indices, 2));
-
-//    builder->CreateStore(ptr, string_malloc);
-
-    codegen_print_integer(m,builder->CreateLoad(lengthInst));
-    return ptr;
-//    return codegen_scan_base(Type::getDoubleTy(context),namedValues.at(".string_sc"));
+    return builder->CreateCall(m->getFunction("scanString"), printArgs);
 }
 Value *code_generation::codegen_scan_double() {
     if (!namedValues.contains(".double_sc")){
