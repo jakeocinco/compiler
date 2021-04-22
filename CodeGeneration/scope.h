@@ -24,14 +24,19 @@ private:
     scope* parent;
     std::string s;
     std::map<std::string,variable_inst*> table;
-public:
-    scope(scope* parent = nullptr);
 
-    void add(std::string s, llvm::Type* type, llvm::IRBuilder<>* builder, bool is_allocated = false);
-    void add(std::string s, llvm::Value* value, llvm::Type* type, llvm::IRBuilder<>* builder, bool is_allocated = false);
+    llvm::IRBuilder<>* builder;
+    llvm::LLVMContext* context;
+
+public:
+    scope(scope* parent);
+    scope(llvm::IRBuilder<>* builder, llvm::LLVMContext* context);
+
+    void add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz);
+    void add(std::string s, llvm::Value* value, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz);
 
     variable_inst* get_temp(std::string s);
-    void set(std::string s, llvm::Value* v);
+    void set(std::string s, llvm::Value* v, llvm::Value *index = nullptr);
 
     scope* get_parent();
 };

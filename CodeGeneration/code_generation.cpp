@@ -85,7 +85,7 @@ Module* code_generation::codegen_program_root(node *n) {
     n->children.pop_front(); // Popping program name
     n->children.pop_front(); // Popping is
 
-    variable_scope = new scope();
+    variable_scope = new scope(builder, &context);
 
     Function* f = m->getFunction("mul");
     if (!f)
@@ -219,12 +219,14 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
     Type* type = get_type(n->children.front());
     n->children.pop_front();
+    variable_inst::VARIABLE_CLASS clazz = variable_inst::VARIABLE_CLASS::INSTANCE;
     if (!n->children.empty()) {
         n->children.pop_front(); // [
         int size = cast<ConstantInt>(codegen_expression(n->children.front()))->getZExtValue();
         n->children.pop_front(); // size
         n->children.pop_front(); // ]
         type = ArrayType::get(type, size);
+        clazz = variable_inst::VARIABLE_CLASS::ARRAY_INSTANCE;
     }
 
     Value* variable_ptr;
@@ -241,33 +243,31 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
 //    identifiers.insert_or_assign(s, variable_ptr);
 //    identifier_types.insert_or_assign(s, type);
-    variable_scope->add(s, variable_ptr, type, builder, true);
+    variable_scope->add(s, variable_ptr, type, clazz);
 
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
-//    Value* varInst = identifiers.at(s);
 
     n->children.pop_front();
+    Value* index = nullptr;
+
     if (n->children.front()->type == T_LBRACKET){
 
         n->children.pop_front();
-        Value* index = codegen_expression(n->children.front());
+        index = codegen_expression(n->children.front());
         n->children.pop_front();
         n->children.pop_front();
-
-        Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-        Value *indices[2] = {i32zero, index};
-//        varInst = b->CreateGEP(varInst, ArrayRef<Value *>(indices, 2));
     }
+
     n->children.pop_front();
     Value* v =  codegen_expression(n->children.front());
+    variable_scope->set(s, v,index);
+    
 //    if (identifier_types.at(s) != v->getType()){
 //        if (identifier_types.at(s) == Type::getDoubleTy(context) && v->getType() == Type::getInt32Ty(context))
 //            v = builder->CreateSIToFP(v, identifier_types.at(s));
 //    }
-//    b->CreateStore(v, varInst);
-    variable_scope->set(s, v);
 }
 
 Function *code_generation::codegen_function(node *n, Module* m) {
@@ -314,9 +314,9 @@ Value *code_generation::codegen_function_body(node *n) {
 
     Value* f_temp = Function::Create(FT, Function::ExternalLinkage, name, m);
 
-    variable_scope->add(name, f_temp, f_temp->getType(), builder, false);
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
     variable_scope = new scope(variable_scope);
-    variable_scope->add(name, f_temp, f_temp->getType(), builder, false);
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
 
     Function* f = cast<Function>(f_temp);
 
@@ -335,7 +335,7 @@ Value *code_generation::codegen_function_body(node *n) {
 
     namedValues.clear();
     for (auto &Arg : f->args()){
-        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), builder, false);
+        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE);
     }
 
     n->children.pop_front(); // Popping params
@@ -546,7 +546,19 @@ Value *code_generation::codegen_factor(node *n) {
 
     if (x->type == T_INTEGER_LITERAL) return_val = codegen_literal_integer(x->val.intValue);
     else if (x->type == T_FLOAT_LITERAL) return_val = codegen_literal_float(x->val.doubleValue);
-    else if (x->type == T_IDENTIFIER) return_val = variable_scope->get_temp(x->val.stringValue)->get();
+    else if (x->type == T_IDENTIFIER) {
+        if (n->children.empty()){
+            return_val = variable_scope->get_temp(x->val.stringValue)->get();
+        } else {
+            Value* index = codegen_expression(n->children.front());
+
+            return_val = variable_scope->get_temp(x->val.stringValue)->get(index);
+//            Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+//            Value *indices[2] = {i32zero, index};
+//            auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
+//            return_val = builder->CreateLoad(varInst);
+        }
+    }
     else if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
         const string functionName = x->children.front()->val.stringValue;
         x->children.pop_front();
