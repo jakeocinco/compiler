@@ -85,7 +85,7 @@ Module* code_generation::codegen_program_root(node *n) {
     n->children.pop_front(); // Popping program name
     n->children.pop_front(); // Popping is
 
-    variable_scope = new scope(builder, &context);
+    variable_scope = new scope(builder, m);
 
     Function* f = m->getFunction("mul");
     if (!f)
@@ -104,46 +104,29 @@ Module* code_generation::codegen_program_root(node *n) {
         codegen_print_prototype(m); // Move this inside
         codegen_scan_prototype();
         codegen_declaration_block(n->children.front(), builder);
-//        /** **/
-////        string s = "var";
-////        Value* size = codegen_literal_integer(3);
-////        Type* type = Type::getInt32Ty(context);
-////        Value* variable_ptr = builder->CreateAlloca(type, size, s.c_str());
-//////        builder->CreateSt/
-////        llvm::Value *i32zero = llvm::ConstantInt::get(context, llvm::APInt(32, 0));
-////        llvm::Value *i32one = llvm::ConstantInt::get(context, llvm::APInt(32, 0));
-////        llvm::Value *indices[2] = {i32zero, i32one};
-////
-////
-//////        llvm::Value* varInst = builder->CreateGEP(type, variable_ptr, i32one);
-////        llvm::Value* varInst = builder->CreateGEP(variable_ptr, i32one);
-////        llvm::Value* varInst = builder->CreateGEP(variable_ptr, llvm::ArrayRef<llvm::Value *>(indices, 2));
+
+//        auto ss = StringRef("shit");
+//        auto string_val = ConstantDataArray::getString(context, ss, true);
 //
-////        codegen_print_integer()
-//        string str = "AA";
-//        string s2 = "var_str";
-//        Type* type = Type::getInt8Ty(context);
-//        Value* variable_ptr = builder->CreateAlloca(type, codegen_literal_integer(str.length() + 1),s2);
-//
-//        llvm::Value *i32zero = llvm::ConstantInt::get(context, llvm::APInt(32, 0));
-//        llvm::Value *i32one = llvm::ConstantInt::get(context, llvm::APInt(32, 1));
-//        llvm::Value *i32two = llvm::ConstantInt::get(context, llvm::APInt(32, 2));
-//
-//        llvm::Value* varInst = builder->CreateGEP(variable_ptr, i32zero);
-//        builder->CreateStore(ConstantInt::get(Type::getInt8Ty(context), APInt(8, 65)),varInst);
-//        varInst = builder->CreateGEP(variable_ptr, i32one);
-//        builder->CreateStore(ConstantInt::get(Type::getInt8Ty(context), APInt(8, 65)),varInst);
-//        varInst = builder->CreateGEP(variable_ptr, i32two);
-//        builder->CreateStore(ConstantInt::get(Type::getInt8Ty(context), APInt(8, 0)),varInst);
-//
-//        codegen_print_string(m,builder->CreateGEP(variable_ptr, i32zero));
-//        /** **/
+//        AllocaInst* alloca = builder->CreateAlloca(string_val->getType(), 0, "temp_string_alloca");
+//        builder->CreateStore(string_val, alloca);
+//        Value *i32zero = ConstantInt::get(context, APInt(8, 0));
+//        Value *i32one = ConstantInt::get(context, APInt(8, 0));
+//        Value *indices[2] = {i32zero, i32one};
+//        Value* ptr = builder->CreateGEP(alloca, ArrayRef<Value *>(indices, 2));
+//        ptr->
+//        Value* vv = builder->CreateLoad(ptr);
+//        codegen_print_string(m, vv);
+
         n->children.pop_front(); // ignoring declaration block for now
         n->children.pop_front(); // Popping begin
 
         codegen_statement_block(n->children.front(), builder);
         n->children.pop_front();
 
+//        Value* temp = variable_scope->get_temp("arr")->get();
+//        builder->CreateInBoundsGEP()
+//        ConstantArray* ca = cast<ConstantArray>(temp);
 //        identifiers.insert_or_assign("words", alloca);
         builder->CreateRet(ConstantInt::get(context, APInt(32,0)));
 //        verifyFunction(*f);
@@ -250,19 +233,22 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
 
     Type* type = get_type(n->children.front());
+    Type* element_type = type;
     n->children.pop_front();
+    int size = 1;
     variable_inst::VARIABLE_CLASS clazz = variable_inst::VARIABLE_CLASS::INSTANCE;
     if (!n->children.empty()) {
         n->children.pop_front(); // [
-        int size = cast<ConstantInt>(codegen_expression(n->children.front()))->getZExtValue();
+        size = cast<ConstantInt>(codegen_expression(n->children.front()))->getZExtValue();
         n->children.pop_front(); // size
         n->children.pop_front(); // ]
         type = ArrayType::get(type, size);
+        element_type = type->getArrayElementType();
         clazz = variable_inst::VARIABLE_CLASS::ARRAY_INSTANCE;
     }
 
     Value* variable_ptr;
-    if (is_global) {
+    if (is_global && false) {
         variable_ptr = new GlobalVariable(*m,
                                  type,
                                  true,
@@ -275,7 +261,10 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
 //    identifiers.insert_or_assign(s, variable_ptr);
 //    identifier_types.insert_or_assign(s, type);
-    variable_scope->add(s, variable_ptr, type, clazz);
+    variable_scope->add(s, variable_ptr, element_type, clazz, size);
+
+
+//    ConstantArray::get
 
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
@@ -284,22 +273,58 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     n->children.pop_front();
     Value* index = nullptr;
 
+    bool is_array_index = false;
+
+    Function* function = nullptr;
+    BasicBlock* thenBB = nullptr;
+    BasicBlock* elseBB = nullptr;
+    BasicBlock* mergeBB = nullptr;
+
     if (n->children.front()->type == T_LBRACKET){
+        is_array_index = true;
 
         n->children.pop_front();
         index = codegen_expression(n->children.front());
         n->children.pop_front();
         n->children.pop_front();
+
+        Value* lhs = variable_scope->get_temp(s + "_size")->get();
+        Value* cond = b->CreateICmpSGT(lhs, index);
+
+        Function* function = b->GetInsertBlock()->getParent();
+        thenBB = BasicBlock::Create(context, "validIndex", function);
+        elseBB = BasicBlock::Create(context, "invalidIndex");
+        mergeBB = BasicBlock::Create(context, "ifcont");
+
+        b->CreateCondBr(cond, thenBB, elseBB);
+        b->SetInsertPoint(thenBB);
+
     }
 
-    n->children.pop_front();
-    Value* v =  codegen_expression(n->children.front());
-    variable_scope->set(s, v,index);
-    
-//    if (identifier_types.at(s) != v->getType()){
-//        if (identifier_types.at(s) == Type::getDoubleTy(context) && v->getType() == Type::getInt32Ty(context))
-//            v = builder->CreateSIToFP(v, identifier_types.at(s));
-//    }
+        n->children.pop_front();
+        Value* v =  codegen_expression(n->children.front());
+        variable_scope->set(s, v,index);
+
+
+    if (is_array_index){
+        builder->CreateBr(mergeBB);
+        thenBB = builder->GetInsertBlock();
+
+        function->getBasicBlockList().push_back(elseBB);
+        builder->SetInsertPoint(elseBB);
+
+
+        codegen_print_string(m, codegen_literal_string("Invalid array index"));
+
+
+        builder->CreateBr(mergeBB);
+        elseBB = builder->GetInsertBlock();
+
+        function->getBasicBlockList().push_back(mergeBB);
+        builder->SetInsertPoint(mergeBB);
+
+    }
+
 }
 
 Function *code_generation::codegen_function(node *n, Module* m) {
@@ -584,7 +609,37 @@ Value *code_generation::codegen_factor(node *n) {
         } else {
             Value* index = codegen_expression(n->children.front());
 
+            string name = x->val.stringValue;
+            Value* lhs = variable_scope->get_temp(name + "_size")->get();
+            Value* cond = builder->CreateICmpSGT(lhs, index);
+
+            Function* function = builder->GetInsertBlock()->getParent();
+            BasicBlock* thenBB = BasicBlock::Create(context, "validIndex", function);
+            BasicBlock* elseBB = BasicBlock::Create(context, "invalidIndex");
+            BasicBlock* mergeBB = BasicBlock::Create(context, "ifcont");
+
+            builder->CreateCondBr(cond, thenBB, elseBB);
+            builder->SetInsertPoint(thenBB);
+
+
             return_val = variable_scope->get_temp(x->val.stringValue)->get(index);
+
+
+            builder->CreateBr(mergeBB);
+            thenBB = builder->GetInsertBlock();
+
+            function->getBasicBlockList().push_back(elseBB);
+            builder->SetInsertPoint(elseBB);
+
+
+            codegen_print_string(m, codegen_literal_string("Invalid array index"));
+
+
+            builder->CreateBr(mergeBB);
+            elseBB = builder->GetInsertBlock();
+
+            function->getBasicBlockList().push_back(mergeBB);
+            builder->SetInsertPoint(mergeBB);
         }
     }
     else if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
@@ -640,7 +695,6 @@ void code_generation::codegen_print_prototype(Module *mod) {
 }
 Value* code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr) {
     std::vector<Value *> printArgs;
-
     printArgs.push_back(formatStr);
     printArgs.push_back(v);
 

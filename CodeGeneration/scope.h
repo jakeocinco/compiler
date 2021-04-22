@@ -26,14 +26,14 @@ private:
     std::map<std::string,variable_inst*> table;
 
     llvm::IRBuilder<>* builder;
-    llvm::LLVMContext* context;
+    llvm::Module* module;
 
 public:
     scope(scope* parent);
-    scope(llvm::IRBuilder<>* builder, llvm::LLVMContext* context);
+    scope(llvm::IRBuilder<>* builder, llvm::Module* module);
 
-    void add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz);
-    void add(std::string s, llvm::Value* value, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz);
+    void add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size = 1);
+    void add(std::string s, llvm::Value* value, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size = 1);
 
     variable_inst* get_temp(std::string s);
     void set(std::string s, llvm::Value* v, llvm::Value *index = nullptr);

@@ -1,7 +1,14 @@
 program LoopFib is
-    variable ss : string;
+    variable arr1 : integer[3];
+    variable arr2 : integer[3];
+    variable loopVal : integer;
+    variable loopVal2 : float;
     variable tempbool : bool;
 begin
-    ss := getString();
-    tempbool := putBool(ss == "Yes\00");
+    /*arr1 := 1;
+    for (loopVal := 0; loopVal < 3)
+        tempbool := putInteger(arr1[loopVal]);
+    end for;*/
+    loopVal2 := 21.0;
+    tempbool := putFloat(loopVal2);
 end program.

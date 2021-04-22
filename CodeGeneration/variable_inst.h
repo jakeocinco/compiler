@@ -21,16 +21,17 @@ private:
     VARIABLE_CLASS clazz;
     llvm::Value* val;
     llvm::Type* type;
+    int size;
 
     llvm::IRBuilder<>* b;
-    llvm::LLVMContext* c;
+    llvm::Module* m;
 public:
 
     variable_inst();
 //    ~variable_inst();
     variable_inst(variable_inst const &v);
-    variable_inst(llvm::IRBuilder<>* builder, llvm::LLVMContext* context, llvm::Type* type, VARIABLE_CLASS clazz);
-    variable_inst(llvm::IRBuilder<>* builder,  llvm::LLVMContext* context, llvm::Value *value, llvm::Type* type, VARIABLE_CLASS clazz);
+    variable_inst(llvm::IRBuilder<>* builder, llvm::Module* module, llvm::Type* type, VARIABLE_CLASS clazz, int size);
+    variable_inst(llvm::IRBuilder<>* builder,  llvm::Module* module, llvm::Value *value, llvm::Type* type, VARIABLE_CLASS clazz, int size);
 
     llvm::Value* get(llvm::Value* index = nullptr);
     void set(llvm::Value* val, llvm::Value *index);
