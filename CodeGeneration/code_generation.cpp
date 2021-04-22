@@ -310,7 +310,7 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
 
         int exp_size;
         Value* v =  codegen_expression(n->children.front(),exp_size);
-        variable_scope->set(s, v,index);
+        variable_scope->set(s, v,exp_size, index);
 
 
     if (is_array_index){
@@ -515,11 +515,11 @@ Value *code_generation::codegen_arith_op(node *n, int& size,  Value* lhs) {
         case T_ADD:
             return codegen_arith_op(n, size,operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFAdd(lhs, rhs,"addtmp");},
-                                lhs, rhs));
+                                lhs, size, rhs, rhs_size));
         case T_MINUS:
             return codegen_arith_op(n, size,operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFSub(lhs, rhs,"subtmp");},
-                                lhs, rhs));
+                                lhs, size, rhs, rhs_size));
         default:
             cout << "Error" << endl;
     }
@@ -548,27 +548,27 @@ Value *code_generation::codegen_relation(node *n, int& size, Value* lhs) {
         case T_L_THAN:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOLT(lhs, rhs,"lthan");},
-                    lhs, rhs, true));
+                    lhs, size, rhs, rhs_size, true));
         case T_LE_THAN:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOLE(lhs, rhs,"lethan");},
-                    lhs, rhs, true));
+                    lhs, size, rhs, rhs_size, true));
         case T_G_THAN:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOGT(lhs, rhs,"gthan");},
-                    lhs, rhs, true));
+                    lhs, size, rhs, rhs_size, true));
         case T_GE_THAN:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOGE(lhs, rhs,"gethan");},
-                    lhs, rhs, true));
+                    lhs, size, rhs, rhs_size, true));
         case T_D_EQUALS:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOEQ(lhs, rhs,"equals");},
-                    lhs, rhs, true));
+                    lhs, size, rhs, rhs_size, true));
         case T_N_EQUALS:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpONE(lhs, rhs,"nequals");},
-                    lhs, rhs, true));
+                    lhs, size, rhs, rhs_size, true));
         default:
             cout << "Error" << endl;
     }
@@ -602,11 +602,11 @@ Value *code_generation::codegen_term(node *n, int& size, Value* lhs) {
         case T_MULTIPLY:
             return codegen_term(n, size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFMul(lhs, rhs,"multmp");},
-                    lhs, rhs));
+                    lhs, size, rhs, rhs_size));
         case T_DIVIDE:
             return codegen_term(n, size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFDiv(lhs, rhs,"divtmp");},
-                    lhs, rhs));
+                    lhs, size, rhs, rhs_size));
         default:
             cout << "Error" << endl;
     }
@@ -626,7 +626,10 @@ Value *code_generation::codegen_factor(node *n, int& size) {
         n->children.pop_front();
     }
 
-    if (x->type == T_INTEGER_LITERAL) {
+    if (x->type == T_EXPRESSION){
+        return_val = codegen_expression(x, size);
+    }
+    else if (x->type == T_INTEGER_LITERAL) {
         return_val = codegen_literal_integer(x->val.intValue);
         size = 1;
     }
@@ -872,29 +875,56 @@ Value *code_generation::codegen_scan_bool() {
 }
 
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
-                                        Value* lhs, Value* rhs, bool is_comparison) {
-    Type* lhs_type = nullptr;
-    Type* rhs_type = nullptr;
+                                        Value* lhs, int &lhs_size,
+                                        Value* rhs, int rhs_size,
+                                        bool is_comparison) {
 
-    if (lhs->getType() != Type::getDoubleTy(context)){
-        lhs_type = lhs->getType();
-        lhs = builder->CreateSIToFP(lhs, Type::getDoubleTy(context));
+    if (lhs_size == 1 && rhs_size == 1){
+        Type* lhs_type = nullptr;
+        Type* rhs_type = nullptr;
+
+        if (lhs->getType() != Type::getDoubleTy(context)){
+            lhs_type = lhs->getType();
+            lhs = builder->CreateSIToFP(lhs, Type::getDoubleTy(context));
+        }
+        if (rhs != nullptr && rhs->getType() != Type::getDoubleTy(context)){
+            rhs_type = rhs->getType();
+            rhs = builder->CreateSIToFP(rhs, Type::getDoubleTy(context));
+        }
+
+        Value *v = floating_op(lhs,rhs);
+
+        if (lhs_type != nullptr && rhs_type != nullptr && lhs_type == rhs_type && !is_comparison)
+            v = builder->CreateFPToSI(v, rhs_type);
+
+        return v;
+    } else if (lhs_size == 1 || rhs_size == 1) {
+        Value* temp_lhs = lhs;
+        Value* temp_rhs = rhs;
+
+        if (lhs_size == 1){
+            temp_rhs = lhs;
+            temp_lhs = rhs;
+            lhs_size = rhs_size;
+            rhs_size = 1;
+        }
+
+        for (int i = 0; i < lhs_size; i++){
+            Value* temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
+
+            llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
+            llvm::Value *indices[2] = {i32zero, temp_index};
+
+            llvm::Value* varInst = builder->CreateInBoundsGEP(temp_lhs, llvm::ArrayRef<llvm::Value *>(indices, 2));
+            int temp = 1;
+            Value* op = operation_block(floating_op, builder->CreateLoad(varInst), temp, temp_rhs, 1);
+            builder->CreateStore(op, varInst);
+        }
+
+        return temp_lhs;
     }
-    if (rhs != nullptr && rhs->getType() != Type::getDoubleTy(context)){
-        rhs_type = rhs->getType();
-        rhs = builder->CreateSIToFP(rhs, Type::getDoubleTy(context));
-    }
+    return nullptr;
 
-    Value *v = floating_op(lhs,rhs);
-
-//    if (lhs_type != nullptr)
-//        lhs = builder->CreateFPToSI(lhs, lhs_type);
-//    if (rhs_type != nullptr)
-//        rhs = builder->CreateFPToSI(rhs, rhs_type);
-    if (lhs_type != nullptr && rhs_type != nullptr && lhs_type == rhs_type && !is_comparison)
-        v = builder->CreateFPToSI(v, rhs_type);
-
-    return v;
 }
 
 Type *code_generation::get_type(node *n) {

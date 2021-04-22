@@ -32,7 +32,7 @@ llvm::Value* variable_inst::get(llvm::Value* index) {
         auto varInst = b->CreateInBoundsGEP(array_inst, llvm::ArrayRef<llvm::Value *>(indices, 2));
         return b->CreateLoad(varInst);
     } else if (clazz == VARIABLE_CLASS::ARRAY_INSTANCE && index == nullptr) {
-            return b->CreateLoad(val);
+            return val;
     } else
         return val;
 }

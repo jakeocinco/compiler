@@ -47,9 +47,9 @@ void scope::add(std::string s, llvm::Value *value, llvm::Type *type, variable_in
     }
 }
 
-void scope::set(std::string s, llvm::Value *v, llvm::Value *index) {
+void scope::set(std::string s, llvm::Value *v, int size, llvm::Value *index) {
     variable_inst* vi = get_temp(s);
-    vi->set(v,index);
+    vi->set(v,index, size);
 }
 
 scope* scope::get_parent(){

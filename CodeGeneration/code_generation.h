@@ -141,7 +141,9 @@ private:
     Value* codegen_scan_bool();
 
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
-                           Value* lhs, Value* rhs, bool is_comparison = false);
+                           Value* lhs, int &lhs_size,
+                           Value* rhs,  int rhs_size,
+                           bool is_comparison = false);
     Value* generateValue(Module* m);
 };
 
