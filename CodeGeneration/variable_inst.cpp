@@ -37,33 +37,60 @@ llvm::Value* variable_inst::get(llvm::Value* index) {
         return val;
 }
 
-void variable_inst::set(llvm::Value *val, llvm::Value *index) {
+void variable_inst::set(llvm::Value *val, llvm::Value *index, int new_val_size) {
 
-    int temp_size = size;
-    llvm::Value* temp_index = nullptr;
-    if (index == nullptr)
-        temp_size = 1;
 
-    for (int i = 0; i < temp_size; i++){
-        if (type != val->getType()){
-            if (type == llvm::Type::getDoubleTy(m->getContext()) && val->getType() == llvm::Type::getInt32Ty(m->getContext()))
-                val = b->CreateSIToFP(val, type);
-        }
 
-        if (clazz == VARIABLE_CLASS::INSTANCE){
-            b->CreateStore(val, this->val);
-        } else if (clazz == VARIABLE_CLASS::ARRAY_INSTANCE){
-            llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
-            llvm::Value *indices[2] = {i32zero, index};
 
-//        llvm::Value* varInst = b->CreateGEP(this->val, llvm::ArrayRef<llvm::Value *>(indices, 2));
-            llvm::Value* varInst = b->CreateInBoundsGEP(this->val, llvm::ArrayRef<llvm::Value *>(indices, 2));
-            b->CreateStore(val, varInst);
-        }  else {
-            this->val = val;
-        }
+
+
+    if (type != val->getType()){
+        if (type == llvm::Type::getDoubleTy(m->getContext()) && val->getType() == llvm::Type::getInt32Ty(m->getContext()))
+            val = b->CreateSIToFP(val, type);
     }
 
+    if (clazz == VARIABLE_CLASS::INSTANCE){
+        b->CreateStore(val, this->val);
+    } else if (clazz == VARIABLE_CLASS::ARRAY_INSTANCE){
+        int temp_size = size;
+        llvm::Value* temp_index = nullptr;
+        if (index != nullptr){
+            temp_size = 1;
+            temp_index = index;
+        }
+        if (new_val_size == 1){
+            for (int i = 0; i < temp_size; i++){
+                if (index == nullptr){
+                    temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
+                }
+                llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
+                llvm::Value *indices[2] = {i32zero, temp_index};
+
+                llvm::Value* varInst = b->CreateInBoundsGEP(this->val, llvm::ArrayRef<llvm::Value *>(indices, 2));
+                b->CreateStore(val, varInst);
+            }
+        } else {
+            for (int i = 0; i < temp_size; i++){
+                if (index == nullptr){
+                    temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
+                }
+                llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
+                llvm::Value *indices[2] = {i32zero, temp_index};
+
+                llvm::Value* varInst = b->CreateInBoundsGEP(this->val, llvm::ArrayRef<llvm::Value *>(indices, 2));
+
+//                llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
+//                llvm::Value *indices[2] = {i32zero, temp_index};
+
+                llvm::Value* newVarInst = b->CreateInBoundsGEP(val, llvm::ArrayRef<llvm::Value *>(indices, 2));
+
+                b->CreateStore(b->CreateLoad(newVarInst), varInst);
+            }
+        }
+
+    }  else {
+        this->val = val;
+    }
 
 
 }
@@ -85,6 +112,10 @@ variable_inst::variable_inst(variable_inst const &v) {
     this->type = v.type;
     this->val = v.val;
     this->b = v.b;
+}
+
+int variable_inst::get_size() {
+    return size;
 }
 
 

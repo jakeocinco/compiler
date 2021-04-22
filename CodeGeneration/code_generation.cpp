@@ -151,7 +151,8 @@ void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
 
 void code_generation::codegen_if_statement(node* n) {
     n->children.pop_front(); // Popping if
-    Value* condition = codegen_expression(n->children.front());
+    int bool_size;
+    Value* condition = codegen_expression(n->children.front(), bool_size);
     n->children.pop_front(); // Popping expression
     n->children.pop_front(); // Popping then
 
@@ -192,7 +193,8 @@ void code_generation::codegen_for_statement(node *n) {
     n->children.pop_front(); // pop loop var assignment
 
     node* conditional_copy = new node(n->children.front()); // copying conditional
-    Value* start_conditional = codegen_expression(n->children.front());
+    int cond_size;
+    Value* start_conditional = codegen_expression(n->children.front(),cond_size);
     n->children.pop_front(); // Popping expression
 
     Function* function = builder->GetInsertBlock()->getParent();
@@ -205,7 +207,7 @@ void code_generation::codegen_for_statement(node *n) {
     codegen_statement_block(n->children.front(), builder);
     n->children.pop_front(); // pop statement
 
-    Value *endVal = codegen_expression(conditional_copy); // codegen for end expression
+    Value *endVal = codegen_expression(conditional_copy, cond_size); // codegen for end expression
     builder->CreateCondBr(endVal, loopBB, continueBB);
     n->children.pop_front(); // Popping end
     n->children.pop_front(); // Popping for
@@ -215,7 +217,8 @@ void code_generation::codegen_for_statement(node *n) {
 }
 void code_generation::codegen_return_statement(node *n) {
     n->children.pop_front(); // Popping return
-    builder->CreateRet(codegen_expression(n->children.front()));
+    int cond_size;
+    builder->CreateRet(codegen_expression(n->children.front(), cond_size));
     n->children.pop_front(); // Popping return value
 }
 
@@ -239,7 +242,8 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     variable_inst::VARIABLE_CLASS clazz = variable_inst::VARIABLE_CLASS::INSTANCE;
     if (!n->children.empty()) {
         n->children.pop_front(); // [
-        size = cast<ConstantInt>(codegen_expression(n->children.front()))->getZExtValue();
+        int size_size;
+        size = cast<ConstantInt>(codegen_expression(n->children.front(), size_size))->getZExtValue();
         n->children.pop_front(); // size
         n->children.pop_front(); // ]
         type = ArrayType::get(type, size);
@@ -284,14 +288,15 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
         is_array_index = true;
 
         n->children.pop_front();
-        index = codegen_expression(n->children.front());
+        int temp_size;
+        index = codegen_expression(n->children.front(), temp_size);
         n->children.pop_front();
         n->children.pop_front();
 
         Value* lhs = variable_scope->get_temp(s + "_size")->get();
         Value* cond = b->CreateICmpSGT(lhs, index);
 
-        Function* function = b->GetInsertBlock()->getParent();
+        function = b->GetInsertBlock()->getParent();
         thenBB = BasicBlock::Create(context, "validIndex", function);
         elseBB = BasicBlock::Create(context, "invalidIndex");
         mergeBB = BasicBlock::Create(context, "ifcont");
@@ -302,7 +307,9 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     }
 
         n->children.pop_front();
-        Value* v =  codegen_expression(n->children.front());
+
+        int exp_size;
+        Value* v =  codegen_expression(n->children.front(),exp_size);
         variable_scope->set(s, v,index);
 
 
@@ -437,7 +444,7 @@ Value *code_generation::codegen_literal_array(std::vector<Value*> values) {
     return arr;
 }
 
-Value *code_generation::codegen_expression(node *n,  Value* lhs) {
+Value *code_generation::codegen_expression(node *n, int& size,  Value* lhs) {
 
     bool is_not_l = false;
     if (!n->children.empty() && n->children.front()->type == T_NOT){
@@ -446,7 +453,7 @@ Value *code_generation::codegen_expression(node *n,  Value* lhs) {
     }
 
     if (lhs == nullptr){
-        lhs = is_not_l ? builder->CreateNot(codegen_arith_op(n->children.front())) : codegen_arith_op(n->children.front());
+        lhs = is_not_l ? builder->CreateNot(codegen_arith_op(n->children.front(), size)) : codegen_arith_op(n->children.front(),size);
         n->children.pop_front();
     }
 
@@ -461,15 +468,19 @@ Value *code_generation::codegen_expression(node *n,  Value* lhs) {
         n->children.pop_front(); // Pop not
         is_not_r = true;
     }
-    Value* rhs = is_not_r ? builder->CreateNot(codegen_arith_op(n->children.front())) : codegen_arith_op(n->children.front());
+    int rhs_size;
+    Value* rhs = is_not_r ? builder->CreateNot(codegen_arith_op(n->children.front(),rhs_size)) : codegen_arith_op(n->children.front(),rhs_size);
     n->children.pop_front(); // Pop RHS
 
+    if (size != rhs_size){
+        // Do something
+    }
     // check flips
     switch (operation) {
         case T_AND:
-            return codegen_expression(n, builder->CreateAnd(lhs, rhs, "andtmp"));
+            return codegen_expression(n, size, builder->CreateAnd(lhs, rhs, "andtmp"));
         case T_OR:
-            return codegen_expression(n, builder->CreateOr(lhs, rhs, "ortmp"));
+            return codegen_expression(n, size, builder->CreateOr(lhs, rhs, "ortmp"));
         default:
             cout << "Error" << endl;
     }
@@ -477,30 +488,36 @@ Value *code_generation::codegen_expression(node *n,  Value* lhs) {
 
     return nullptr;
 }
-Value *code_generation::codegen_arith_op(node *n,  Value* lhs) {
+Value *code_generation::codegen_arith_op(node *n, int& size,  Value* lhs) {
 
     if (n->children.empty())
         return lhs;
     if (n->children.size() == 1)
-        return codegen_relation(n->children.front());
+        return codegen_relation(n->children.front(), size);
 
     if (lhs == nullptr){
-        lhs = codegen_relation(n->children.front());
+        lhs = codegen_relation(n->children.front(), size);
         n->children.pop_front();
     }
 
     int operation = n->children.front()->type;
     n->children.pop_front();
-    Value* rhs = codegen_relation(n->children.front());
+
+    int rhs_size;
+    Value* rhs = codegen_relation(n->children.front(), rhs_size);
     n->children.pop_front();
+
+    if (size != rhs_size){
+        // Do something
+    }
 
     switch (operation) {
         case T_ADD:
-            return codegen_arith_op(n,operation_block(
+            return codegen_arith_op(n, size,operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFAdd(lhs, rhs,"addtmp");},
                                 lhs, rhs));
         case T_MINUS:
-            return codegen_arith_op(n,operation_block(
+            return codegen_arith_op(n, size,operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFSub(lhs, rhs,"subtmp");},
                                 lhs, rhs));
         default:
@@ -508,44 +525,48 @@ Value *code_generation::codegen_arith_op(node *n,  Value* lhs) {
     }
     return nullptr;
 }
-Value *code_generation::codegen_relation(node *n, Value* lhs) {
+Value *code_generation::codegen_relation(node *n, int& size, Value* lhs) {
 
     if (n->children.empty())
         return lhs;
     if (n->children.size() == 1)
-        return codegen_term(n->children.front());
+        return codegen_term(n->children.front(), size);
 
     if (lhs == nullptr){
-        lhs = codegen_term(n->children.front());
+        lhs = codegen_term(n->children.front(), size);
         n->children.pop_front(); // Pop lhs
     }
     int operation = n->children.front()->type;
     n->children.pop_front(); // Pop operation
-    Value* rhs = codegen_term(n->children.front());
+    int rhs_size;
+    Value* rhs = codegen_term(n->children.front(), rhs_size);
+    if (size != rhs_size){
+        // Do something
+    }
     n->children.pop_front(); // Pop rhs
     switch (operation) {
         case T_L_THAN:
-            return codegen_term(n, operation_block(
+            return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOLT(lhs, rhs,"lthan");},
                     lhs, rhs, true));
         case T_LE_THAN:
-            return codegen_term(n, operation_block(
+            return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOLE(lhs, rhs,"lethan");},
                     lhs, rhs, true));
         case T_G_THAN:
-            return codegen_term(n, operation_block(
+            return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOGT(lhs, rhs,"gthan");},
                     lhs, rhs, true));
         case T_GE_THAN:
-            return codegen_term(n, operation_block(
+            return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOGE(lhs, rhs,"gethan");},
                     lhs, rhs, true));
         case T_D_EQUALS:
-            return codegen_term(n, operation_block(
+            return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpOEQ(lhs, rhs,"equals");},
                     lhs, rhs, true));
         case T_N_EQUALS:
-            return codegen_term(n, operation_block(
+            return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpONE(lhs, rhs,"nequals");},
                     lhs, rhs, true));
         default:
@@ -553,21 +574,25 @@ Value *code_generation::codegen_relation(node *n, Value* lhs) {
     }
     return nullptr;
 }
-Value *code_generation::codegen_term(node *n, Value* lhs) {
+Value *code_generation::codegen_term(node *n, int& size, Value* lhs) {
 
     if (n->children.empty())
         return lhs;
     if (n->children.size() == 1)
-        return codegen_factor(n->children.front());
+        return codegen_factor(n->children.front(), size);
 
     if (lhs == nullptr){
-        lhs = codegen_factor(n->children.front());
+        lhs = codegen_factor(n->children.front(), size);
         n->children.pop_front();
     }
 
     int operation = n->children.front()->type;
     n->children.pop_front();
-    Value* rhs = codegen_factor(n->children.front());
+    int rhs_size;
+    Value* rhs = codegen_factor(n->children.front(),rhs_size);
+    if (size != rhs_size){
+        // Do something
+    }
     n->children.pop_front();
 
     std::function<Value*(Value* lhs, Value* rhs)> standard_op = [this](Value* lhs, Value* rhs){return builder->CreateMul(lhs, rhs);};
@@ -575,11 +600,11 @@ Value *code_generation::codegen_term(node *n, Value* lhs) {
 
     switch (operation) {
         case T_MULTIPLY:
-            return codegen_term(n, operation_block(
+            return codegen_term(n, size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFMul(lhs, rhs,"multmp");},
                     lhs, rhs));
         case T_DIVIDE:
-            return codegen_term(n, operation_block(
+            return codegen_term(n, size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFDiv(lhs, rhs,"divtmp");},
                     lhs, rhs));
         default:
@@ -587,7 +612,7 @@ Value *code_generation::codegen_term(node *n, Value* lhs) {
     }
     return nullptr;
 }
-Value *code_generation::codegen_factor(node *n) {
+Value *code_generation::codegen_factor(node *n, int& size) {
 
     node* x = n->children.front();
     n->children.pop_front();
@@ -601,13 +626,22 @@ Value *code_generation::codegen_factor(node *n) {
         n->children.pop_front();
     }
 
-    if (x->type == T_INTEGER_LITERAL) return_val = codegen_literal_integer(x->val.intValue);
-    else if (x->type == T_FLOAT_LITERAL) return_val = codegen_literal_float(x->val.doubleValue);
+    if (x->type == T_INTEGER_LITERAL) {
+        return_val = codegen_literal_integer(x->val.intValue);
+        size = 1;
+    }
+    else if (x->type == T_FLOAT_LITERAL) {
+        return_val = codegen_literal_float(x->val.doubleValue);
+        size = 1;
+    }
     else if (x->type == T_IDENTIFIER) {
         if (n->children.empty()){
-            return_val = variable_scope->get_temp(x->val.stringValue)->get();
+            auto vi = variable_scope->get_temp(x->val.stringValue);
+            return_val = vi->get();
+            size = vi->get_size();
         } else {
-            Value* index = codegen_expression(n->children.front());
+            int index_size;
+            Value* index = codegen_expression(n->children.front(),index_size);
 
             string name = x->val.stringValue;
             Value* lhs = variable_scope->get_temp(name + "_size")->get();
@@ -623,7 +657,7 @@ Value *code_generation::codegen_factor(node *n) {
 
 
             return_val = variable_scope->get_temp(x->val.stringValue)->get(index);
-
+            size = 1;
 
             builder->CreateBr(mergeBB);
             thenBB = builder->GetInsertBlock();
@@ -645,14 +679,16 @@ Value *code_generation::codegen_factor(node *n) {
     else if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
         const string functionName = x->children.front()->val.stringValue;
         x->children.pop_front();
+        size = 1;
+        int temp_size = 1;
         if (string("putinteger") == functionName) {
-            return_val = codegen_print_integer(m,codegen_expression(x->children.front()));
+            return_val = codegen_print_integer(m,codegen_expression(x->children.front(), temp_size));
         }  else if (string("putfloat") == functionName){
-            return_val = codegen_print_double(m,codegen_expression(x->children.front()));
+            return_val = codegen_print_double(m,codegen_expression(x->children.front(), temp_size));
         }   else if (string("putstring") == functionName) {
-            return_val = codegen_print_string(m, codegen_expression(x->children.front()));
+            return_val = codegen_print_string(m, codegen_expression(x->children.front(), temp_size));
         }   else if (string("putbool") == functionName) {
-            Value *v = codegen_expression(x->children.front());
+            Value *v = codegen_expression(x->children.front(), temp_size);
             return_val = codegen_print_boolean(m, v);
         } else if (string("getinteger") == functionName){
             return_val = codegen_scan_integer();
@@ -667,15 +703,24 @@ Value *code_generation::codegen_factor(node *n) {
             std::vector<Value *> args;
 
             for (auto child : x->children){
-                args.push_back(codegen_expression(child));
+                args.push_back(codegen_expression(child, size));
             }
             // Casting the value back to Function -- this is safe because its created as function, just stored as a value
             return_val = builder->CreateCall(cast<Function>(variable_scope->get_temp(functionName)->get()), args);
         }
     }
-    else if (x->type == T_FALSE) return_val = codegen_literal_boolean(false);
-    else if (x->type == T_TRUE) return_val = codegen_literal_boolean(true);
-    else if (x->type == T_STRING_LITERAL) return_val = codegen_literal_string(x->val.stringValue);
+    else if (x->type == T_FALSE) {
+        return_val = codegen_literal_boolean(false);
+        size = 1;
+    }
+    else if (x->type == T_TRUE) {
+        return_val = codegen_literal_boolean(true);
+        size = 1;
+    }
+    else if (x->type == T_STRING_LITERAL) {
+        return_val = codegen_literal_string(x->val.stringValue);
+        size = 1;
+    }
 
     return is_neg ? builder->CreateNeg(return_val) : return_val;
 }

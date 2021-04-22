@@ -34,9 +34,10 @@ public:
     variable_inst(llvm::IRBuilder<>* builder,  llvm::Module* module, llvm::Value *value, llvm::Type* type, VARIABLE_CLASS clazz, int size);
 
     llvm::Value* get(llvm::Value* index = nullptr);
-    void set(llvm::Value* val, llvm::Value *index);
+    void set(llvm::Value* val, llvm::Value *index, int new_val_size = 1);
     void realloca(llvm::Value* val);
 
+    int get_size();
     variable_inst operator=(const variable_inst& v);
 };
 

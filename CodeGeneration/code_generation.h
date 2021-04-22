@@ -118,11 +118,11 @@ private:
 
     Value* codegen_literal_array(std::vector<Value*> values);
 
-    Value* codegen_expression(node *n, Value* lhs = nullptr);
-    Value* codegen_arith_op(node *n, Value* lhs = nullptr);
-    Value* codegen_relation(node *n, Value* lhs = nullptr);
-    Value* codegen_term(node *n, Value* lhs = nullptr);
-    Value* codegen_factor(node *n);
+    Value* codegen_expression(node *n, int& size, Value* lhs = nullptr);
+    Value* codegen_arith_op(node *n, int& size, Value* lhs = nullptr);
+    Value* codegen_relation(node *n, int& size, Value* lhs = nullptr);
+    Value* codegen_term(node *n, int& size, Value* lhs = nullptr);
+    Value* codegen_factor(node *n, int& size);
 
     void codegen_print_prototype(Module *mod);
     Value* codegen_print_base(Module* mod, Value* v, Value* formatStr);
