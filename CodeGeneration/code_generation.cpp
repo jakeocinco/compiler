@@ -922,6 +922,25 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
         }
 
         return temp_lhs;
+    } else if (lhs_size == rhs_size){
+        Value* temp_lhs = lhs;
+        Value* temp_rhs = rhs;
+
+        for (int i = 0; i < lhs_size; i++){
+            Value* temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
+
+            llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
+            llvm::Value *indices[2] = {i32zero, temp_index};
+
+            llvm::Value* varInst_l = builder->CreateInBoundsGEP(temp_lhs, llvm::ArrayRef<llvm::Value *>(indices, 2));
+            llvm::Value* varInst_r = builder->CreateInBoundsGEP(temp_rhs, llvm::ArrayRef<llvm::Value *>(indices, 2));
+
+            int temp = 1;
+            Value* op = operation_block(floating_op, builder->CreateLoad(varInst_l), temp, builder->CreateLoad(varInst_r), 1);
+            builder->CreateStore(op, varInst_l);
+        }
+
+        return temp_lhs;
     }
     return nullptr;
 

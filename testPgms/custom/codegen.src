@@ -1,14 +1,16 @@
 program LoopFib is
     variable arr1 : integer[3];
     variable arr2 : integer[3];
+    variable arr3 : integer[3];
     variable loopVal : integer;
     variable loopVal2 : float;
     variable tempbool : bool;
 begin
-    arr1 := 3;
-    arr2 :=  (5 + arr1) * 5;
+    arr1 := getInteger();
+    arr2 := 5;
+    arr3 := arr2 - arr1;
     for (loopVal := 0; loopVal < 3)
-        tempbool := putInteger(arr2[loopVal]);
+        tempbool := putInteger(arr3[loopVal]);
         loopVal := loopVal + 1;
     end for;
 end program.
