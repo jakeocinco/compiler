@@ -2,10 +2,22 @@ program LoopFib is
     variable i : integer;
     variable tempBool : bool;
     procedure Sub : integer(variable val1 : integer)
-        variable xx : integer;
+        variable i : integer;
+        procedure Neg : integer(variable val2 : integer)
+            variable i : integer;
+            procedure Sub : integer(variable val1 : integer)
+                variable i : integer;
+            begin
+                i :=  - val1;
+                return i;
+            end procedure;
+        begin
+            i :=  Sub(val2);
+            return i;
+        end procedure;
     begin
-        xx :=  - val1;
-        return xx;
+        i :=  Neg(val1);
+        return i;
     end procedure;
 begin
     i := getInteger();

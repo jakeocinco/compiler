@@ -292,8 +292,6 @@ Function *code_generation::codegen_function(node *n, Module* m) {
 
 Value *code_generation::codegen_function_body(node *n) {
 
-    variable_scope = new scope(variable_scope);
-
     n->children.pop_front(); // Popping procedure
     std::string name = n->children.front()->val.stringValue;
     n->children.pop_front(); // Popping name
@@ -314,7 +312,13 @@ Value *code_generation::codegen_function_body(node *n) {
 
     FunctionType *FT = FunctionType::get(return_type, arg_types, false);
 
-    Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
+    Value* f_temp = Function::Create(FT, Function::ExternalLinkage, name, m);
+
+    variable_scope->add(name, f_temp, f_temp->getType(), builder, false);
+    variable_scope = new scope(variable_scope);
+    variable_scope->add(name, f_temp, f_temp->getType(), builder, false);
+
+    Function* f = cast<Function>(f_temp);
 
     // Set names for all arguments.
     unsigned Idx = 0;
@@ -331,10 +335,6 @@ Value *code_generation::codegen_function_body(node *n) {
 
     namedValues.clear();
     for (auto &Arg : f->args()){
-//        Value* temp = &Arg;
-//        auto
-//        identifiers.insert_or_assign(std::string(Arg.getName()), )
-//        namedValues[std::string(Arg.getName())] = &Arg;
         variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), builder, false);
     }
 
@@ -545,26 +545,9 @@ Value *code_generation::codegen_factor(node *n) {
     }
 
     if (x->type == T_INTEGER_LITERAL) return_val = codegen_literal_integer(x->val.intValue);
-    if (x->type == T_FLOAT_LITERAL) return_val = codegen_literal_float(x->val.doubleValue);
-    if (x->type == T_IDENTIFIER) {
-        return_val = variable_scope->get_temp(x->val.stringValue)->get();
-//        if (n->children.empty()){
-//            if (namedValues.contains(x->val.stringValue)){
-//                return_val = namedValues.at(x->val.stringValue);
-//            } else if (identifiers.contains(x->val.stringValue)){
-//                return_val = builder->CreateLoad(identifiers.at(x->val.stringValue));
-//            }
-//        } else {
-//            Value* index = codegen_expression(n->children.front());
-//            Value* array_inst = identifiers.at(x->val.stringValue);
-//            Value *i32zero = ConstantInt::get(context, APInt(8, 0));
-//            Value *indices[2] = {i32zero, index};
-//            auto varInst = builder->CreateGEP(array_inst, ArrayRef<Value *>(indices, 2));
-//            return_val = builder->CreateLoad(varInst);
-//        }
-
-    }
-    if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
+    else if (x->type == T_FLOAT_LITERAL) return_val = codegen_literal_float(x->val.doubleValue);
+    else if (x->type == T_IDENTIFIER) return_val = variable_scope->get_temp(x->val.stringValue)->get();
+    else if (x->type == T_PROCEDURE_CALL && x->children.front()->type == T_IDENTIFIER){
         const string functionName = x->children.front()->val.stringValue;
         x->children.pop_front();
         if (string("putinteger") == functionName) {
@@ -591,12 +574,13 @@ Value *code_generation::codegen_factor(node *n) {
             for (auto child : x->children){
                 args.push_back(codegen_expression(child));
             }
-            return_val = builder->CreateCall(m->getFunction(functionName), args);
+            // Casting the value back to Function -- this is safe because its created as function, just stored as a value
+            return_val = builder->CreateCall(cast<Function>(variable_scope->get_temp(functionName)->get()), args);
         }
     }
-    if (x->type == T_FALSE) return_val = codegen_literal_boolean(false);
-    if (x->type == T_TRUE) return_val = codegen_literal_boolean(true);
-    if (x->type == T_STRING_LITERAL) return_val = codegen_literal_string(x->val.stringValue);
+    else if (x->type == T_FALSE) return_val = codegen_literal_boolean(false);
+    else if (x->type == T_TRUE) return_val = codegen_literal_boolean(true);
+    else if (x->type == T_STRING_LITERAL) return_val = codegen_literal_string(x->val.stringValue);
 
     return is_neg ? builder->CreateNeg(return_val) : return_val;
 }
