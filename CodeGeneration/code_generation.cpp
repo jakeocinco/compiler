@@ -192,9 +192,9 @@ void code_generation::codegen_function_prototype(node *n) {
     // Have to add the function to scope as Value*
     Value* f_temp = Function::Create(f_type, Function::ExternalLinkage, name, m);
 
-    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION, false);
     variable_scope = new scope(variable_scope);
-    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION, false);
 
     // Have to cast function back to Function*
     auto* f = cast<Function>(f_temp);
@@ -210,7 +210,7 @@ void code_generation::codegen_function_prototype(node *n) {
     builder->SetInsertPoint(func_block);
 
     for (auto &Arg : f->args()){
-        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE);
+        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE, false);
     }
 
 
@@ -272,7 +272,7 @@ void code_generation::codegen_variable_declaration(node *n) {
         variable_ptr = builder->CreateAlloca(type, nullptr, s);
     }
 
-    variable_scope->add(s, variable_ptr, element_type, clazz, size);
+    variable_scope->add(s, variable_ptr, element_type, clazz, is_global, size);
 }
 void code_generation::codegen_variable_assignment(node *n) {
 
@@ -296,7 +296,7 @@ void code_generation::codegen_variable_assignment(node *n) {
         index = codegen_expression(get_reserve_node(n,T_EXPRESSION), temp_size);
         get_reserve_node(n,T_RBRACKET);
 
-        Value* lhs = variable_scope->get_temp(s + "_size")->get();
+        Value* lhs = variable_scope->get(s + "_size")->get();
         Value* cond = builder->CreateICmpSGT(lhs, index);
 
         parent_function = builder->GetInsertBlock()->getParent();
@@ -539,7 +539,7 @@ Value *code_generation::codegen_factor(node *n, int& size) {
     }
     else if (x->type == T_IDENTIFIER) {
         if (n->children.empty()){
-            auto vi = variable_scope->get_temp(x->val.stringValue);
+            auto vi = variable_scope->get(x->val.stringValue);
             return_val = vi->get();
             size = vi->get_size();
         }
@@ -548,7 +548,7 @@ Value *code_generation::codegen_factor(node *n, int& size) {
             Value* index = codegen_expression(n->children.front(),index_size);
 
             string name = x->val.stringValue;
-            Value* lhs = variable_scope->get_temp(name + "_size")->get();
+            Value* lhs = variable_scope->get(name + "_size")->get();
             Value* cond = builder->CreateICmpSGT(lhs, index);
 
             Function* function = builder->GetInsertBlock()->getParent();
@@ -560,7 +560,7 @@ Value *code_generation::codegen_factor(node *n, int& size) {
             builder->SetInsertPoint(thenBB);
 
 
-            return_val = variable_scope->get_temp(x->val.stringValue)->get(index);
+            return_val = variable_scope->get(x->val.stringValue)->get(index);
             size = 1;
 
             builder->CreateBr(mergeBB);
@@ -619,7 +619,7 @@ Value *code_generation::codegen_factor(node *n, int& size) {
                 args.push_back(codegen_expression(child, size));
             }
             // Casting the value back to Function -- this is safe because its created as function, just stored as a value
-            return_val = builder->CreateCall(cast<Function>(variable_scope->get_temp(functionName)->get()), args);
+            return_val = builder->CreateCall(cast<Function>(variable_scope->get(functionName)->get()), args);
         }
     }
     else if (x->type == T_FALSE) {

@@ -7,7 +7,6 @@ variable out: bool;
 variable blank: integer[2];
 
 procedure Fib : integer(variable val :integer)
-
 	procedure Sub : integer(variable val1 : integer)
 		begin
 		    blank[0] := 0;

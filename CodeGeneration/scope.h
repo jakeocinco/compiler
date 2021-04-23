@@ -10,6 +10,7 @@
 #include <string>
 #include <map>
 #include "variable_inst.h"
+#include <cassert>
 
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
@@ -33,9 +34,9 @@ public:
     scope(llvm::IRBuilder<>* builder, llvm::Module* module);
 
     void add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size = 1);
-    void add(std::string s, llvm::Value* value, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size = 1);
+    void add(std::string s, llvm::Value* value, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, bool is_global, int size = 1);
 
-    variable_inst* get_temp(std::string s);
+    variable_inst* get(std::string s);
     void set(std::string s, llvm::Value* v, int size, llvm::Value *index = nullptr);
 
     scope* get_parent();
