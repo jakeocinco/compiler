@@ -7,9 +7,7 @@
 #include "../Parser/parser.h"
 #include "../tokenCodes.h"
 
-//Value *NumberExprAST::codegen() {
-//    return ConstantFP::get_temp(TheContext, APFloat(Val));
-//}
+
 code_generation::code_generation(std::string file_text) {
     auto p = parser(file_text);
     this->tree = p.get_head();
@@ -127,13 +125,19 @@ void code_generation::codegen_declaration_block(node *n, IRBuilder<>* b) {
         if (x->type == T_PROCEDURE_DECLARATION) codegen_function_body(x);
     }
 }
-void code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
+bool code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
+    bool parse_return = false;
     for (node* x : n->children){
         if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
         else if (x->type == T_IF_BLOCK) codegen_if_statement(x);
         else if (x->type == T_FOR_LOOP) codegen_for_statement(x);
-        else if (x->type == T_RETURN_BLOCK) codegen_return_statement(x);
+        else if (x->type == T_RETURN_BLOCK) {
+            codegen_return_statement(x);
+            parse_return = true;
+            break;
+        }
     }
+    return parse_return;
 }
 
 void code_generation::codegen_if_statement(node* n) {
@@ -239,7 +243,7 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     }
 
     Value* variable_ptr;
-    if (is_global && false) {
+    if (is_global) {
 
         variable_ptr = new GlobalVariable(*m,
                                  type,
@@ -341,7 +345,6 @@ Value *code_generation::codegen_function_body(node *n) {
     n->children.pop_front(); // Popping procedure
     std::string name = n->children.front()->val.stringValue;
     n->children.pop_front(); // Popping name
-    n->children.pop_front(); // Popping :
     Type* return_type = get_type(n->children.front());
     n->children.pop_front(); // Popping return type
 
@@ -387,9 +390,12 @@ Value *code_generation::codegen_function_body(node *n) {
     n->children.pop_front(); // Popping params
     codegen_declaration_block(n->children.front(), builder);
     n->children.pop_front(); // Popping declaration block
+
     n->children.pop_front(); // Popping begin
 
-    codegen_statement_block(n->children.front(), builder);
+    if (!codegen_statement_block(n->children.front(), builder)){
+        throw runtime_error(string("Procedure '") + name + "' must contain a return statement.");
+    }
     n->children.pop_front();
 
     builder->SetInsertPoint(currentBlock);

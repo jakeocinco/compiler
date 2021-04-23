@@ -96,7 +96,7 @@ private:
 
     Module* codegen_program_root(node* n);
     void codegen_declaration_block(node* n, IRBuilder<>* b);
-    void codegen_statement_block(node* n, IRBuilder<>* b);
+    bool codegen_statement_block(node* n, IRBuilder<>* b);
 
     Function* codegen_function(node* n, Module* m);
     Value* codegen_function_body(node* n);

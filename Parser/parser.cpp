@@ -105,14 +105,13 @@ node* parser::parse_procedure() {
     const string proc_name = current.val.stringValue;
     n->newChild(expecting_identifier());
 
-    n->newChild(expecting_reserved_word(T_COLON, ":"));
+    expecting_reserved_word(T_COLON, ":");
 
     const unsigned type_val = current.type;
     n->newChild(parse_type_mark());
 
     push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
     push_current_symbol_table();
-    // this one still gets me
     push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
 
     n->newChild(parse_procedure_parameter_list());
@@ -144,9 +143,6 @@ node* parser::parse_procedure_declaration_block() {
 
         run_processes_until_true(n, functionList);
     }
-
-    if (n->children.empty())
-        return nullptr;
     return n;
 }
 node* parser::parse_procedure_statement_block(){
@@ -165,8 +161,6 @@ node* parser::parse_procedure_statement_block(){
         run_processes_until_true(n, functionList);
     }
 
-    if (n->children.empty())
-        return nullptr;
     return n;
 }
 node* parser::parse_procedure_parameter_list(){
@@ -187,8 +181,6 @@ node* parser::parse_procedure_parameter_list(){
 
     expecting_reserved_word(T_RPAREN, ")");
 
-    if (n->children.empty())
-        return nullptr;
     return n;
 }
 node* parser::parse_procedure_return_statement(){
@@ -581,6 +573,7 @@ unsigned parser::type_to_literal(unsigned type){
 }
 
 node*  parser::expecting_reserved_word(int expected_type, const string& expected_value) {
+    parse_block_comments();
     if (current.type == expected_type){
         node* n = new node(expected_value, expected_type);
         consume_token();
@@ -590,6 +583,7 @@ node*  parser::expecting_reserved_word(int expected_type, const string& expected
     return nullptr;
 }
 node*  parser::expecting_identifier() {
+    parse_block_comments();
     if (current.type == T_IDENTIFIER){
         node* n = new node(current.val.stringValue, T_IDENTIFIER);
         consume_token();
@@ -599,6 +593,7 @@ node*  parser::expecting_identifier() {
     return nullptr;
 }
 node*  parser::expecting_predefined_type() {
+    parse_block_comments();
     if (current.type == T_INTEGER_TYPE || current.type == T_FLOAT_TYPE ||
             current.type == T_STRING_TYPE || current.type == T_BOOL_TYPE){
         node* n = new node(current.val.stringValue, current.type);
@@ -609,6 +604,7 @@ node*  parser::expecting_predefined_type() {
     return nullptr;
 }
 node*  parser::expecting_literal(int expected_type) {
+    parse_block_comments();
     if ((expected_type == T_INTEGER_LITERAL) || (expected_type < 0 && current.type == T_INTEGER_LITERAL)){
         node* n = node::create_integer_literal_node(current.val.intValue);
         consume_token();

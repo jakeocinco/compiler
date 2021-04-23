@@ -9,16 +9,16 @@ begin
 i := 100;
 c := "A";
 
-/*if(i > 100) then
+if(i > 100) then
 //do something#
 	i:= 1110;
-end if;*/
+end if;
 
 /*Single #Line Block Comments*/
 
 /*
-/*Multiline Block Comments*/
+/*
+Multiline Block Comments*/
 */
-//"Hello"
-// Test comment
+
 end program.

@@ -7,9 +7,11 @@ program test_program is
     begin
         b := 3;
         y := b;
+	return x + y * 4;
     end procedure;
 begin
-    a := 3;
-    a := f(3);
+    a := 6;
+    a := f(a);
     tmp := putInteger(a);
+    
 end program .

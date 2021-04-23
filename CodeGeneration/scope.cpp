@@ -12,15 +12,21 @@ scope::scope(scope* parent) {
 scope::scope(llvm::IRBuilder<>* builder, llvm::Module* module) {
     this->builder = builder;
     this->module = module;
+    this->parent = nullptr;
 }
 
 variable_inst *scope::get_temp(std::string s) {
     if (this->table.contains(s))
         return this->table.find(s)->second;
     // TODO - Change this to only check global
-    if (this->parent != nullptr)
-        return this->parent->get_temp(s);
+    if (this->parent != nullptr){
+        scope* global_scope = this;
+        while (global_scope->parent != nullptr)
+            global_scope = global_scope->parent;
+        return global_scope->get_temp(s);
+    }
     return nullptr;
+
 }
 
 void scope::add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size) {

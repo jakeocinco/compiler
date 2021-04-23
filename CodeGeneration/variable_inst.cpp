@@ -39,14 +39,10 @@ llvm::Value* variable_inst::get(llvm::Value* index) {
 
 void variable_inst::set(llvm::Value *val, llvm::Value *index, int new_val_size) {
 
-
-
-
-
-
     if (type != val->getType()){
         if (type == llvm::Type::getDoubleTy(m->getContext()) && val->getType() == llvm::Type::getInt32Ty(m->getContext()))
             val = b->CreateSIToFP(val, type);
+
     }
 
     if (clazz == VARIABLE_CLASS::INSTANCE){
