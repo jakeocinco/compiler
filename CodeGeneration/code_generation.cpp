@@ -666,23 +666,34 @@ Value *code_generation::codegen_factor(node *n, int& size) {
         int temp_size = 1;
         if (string("putinteger") == functionName) {
             return_val = codegen_print_integer(m,codegen_expression(x->children.front(), temp_size));
-        }  else if (string("putfloat") == functionName){
+        }
+        else if (string("putfloat") == functionName){
             return_val = codegen_print_double(m,codegen_expression(x->children.front(), temp_size));
-        }   else if (string("putstring") == functionName) {
+        }
+        else if (string("putstring") == functionName) {
             return_val = codegen_print_string(m, codegen_expression(x->children.front(), temp_size));
-        }   else if (string("putbool") == functionName) {
+        }
+        else if (string("putbool") == functionName) {
             Value *v = codegen_expression(x->children.front(), temp_size);
             return_val = codegen_print_boolean(m, v);
-        } else if (string("getinteger") == functionName){
+        }
+        else if (string("getinteger") == functionName){
             return_val = codegen_scan_integer();
-        } else if (string("getfloat") == functionName){
+        }
+        else if (string("getfloat") == functionName){
             return_val = codegen_scan_double();
-        } else if (string("getstring") == functionName){
+        }
+        else if (string("getstring") == functionName){
             Value* v = codegen_scan_string();
             return_val =  v;
-        } else if (string("getbool") == functionName){
+        }
+        else if (string("getbool") == functionName){
             return_val = codegen_scan_bool();
-        } else if (m->getFunction(functionName) != nullptr){
+        }
+        else if (string("sqrt") == functionName){
+            return_val = codegen_sqrt(codegen_expression(x->children.front(),temp_size));
+        }
+        else if (m->getFunction(functionName) != nullptr){
             std::vector<Value *> args;
 
             for (auto child : x->children){
@@ -784,7 +795,7 @@ void code_generation::codegen_scan_prototype() {
     }
 
     Function* stringCompare = m->getFunction("stringCompare");
-    if (scanString == nullptr){
+    if (stringCompare == nullptr){
         std::vector<Type *> args;
         args.push_back(Type::getInt8PtrTy(context));
         args.push_back(Type::getInt8PtrTy(context));
@@ -793,6 +804,14 @@ void code_generation::codegen_scan_prototype() {
         Function::Create(printfType, Function::ExternalLinkage, "stringCompare", m);
     }
 
+    Function* sqrt = m->getFunction("sqrt");
+    if (sqrt == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getDoubleTy(context));
+
+        FunctionType *printfType = FunctionType::get(builder->getDoubleTy(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "sqrt", m);
+    }
 //    Function* stringCompareLLVM = m->getFunction("stringCompareLLVM");
 //    if (scanString == nullptr){
 //        std::vector<Type *> args;
@@ -940,6 +959,16 @@ Value *code_generation::codegen_scan_bool() {
         namedValues.insert_or_assign(".integer_sc", formatStr);
     }
     return codegen_scan_base(Type::getInt1Ty(context),namedValues.at(".integer_sc"));
+}
+
+Value *code_generation::codegen_sqrt(Value* v){
+//    AllocaInst* tempInst = builder->CreateAlloca(t, 0, "temp");
+    std::vector<Value *> printArgs;
+
+    printArgs.push_back(v);
+
+
+    return builder->CreateCall(m->getFunction("sqrt"), printArgs);
 }
 
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,

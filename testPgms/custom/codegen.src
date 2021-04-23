@@ -2,6 +2,6 @@ program LoopFib is
     variable loopVal2 : float;
     variable temp : bool;
 begin
-    loopVal2 := -getFloat();
-    temp := putFloat(loopVal2);
+    loopVal2 := getFloat();
+    temp := putFloat(sqrt(loopVal2));
 end program.

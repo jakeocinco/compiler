@@ -140,6 +140,8 @@ private:
     Value* codegen_scan_integer();
     Value* codegen_scan_bool();
 
+    Value* codegen_sqrt(Value* v);
+
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, int &lhs_size,
                            Value* rhs,  int rhs_size,
