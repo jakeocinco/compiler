@@ -12,38 +12,6 @@ code_generation::code_generation(std::string file_text) {
     auto p = parser(file_text);
     this->tree = p.get_head();
 
-    m = new Module("Program", context);
-
-    auto TargetTriple = sys::getDefaultTargetTriple();
-
-    InitializeAllTargetInfos();
-    InitializeAllTargets();
-    InitializeAllTargetMCs();
-//    InitializeAllAsmParsers();
-    InitializeAllAsmPrinters();
-
-    std::string Error;
-    auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
-
-    auto CPU = "generic";
-    auto Features = "";
-
-    TargetOptions opt;
-    auto RM = Optional<Reloc::Model>();
-    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-
-    m->setDataLayout(TargetMachine->createDataLayout());
-    m->setTargetTriple(TargetTriple);
-
-
-    // Print an error and exit if we couldn't find the requested target.
-    // This generally occurs if we've forgotten to initialise the
-    // TargetRegistry or we have a bogus target triple.
-    if (!Target) {
-        errs() << Error;
-        cout << "ERROR";
-    }
-
     IRBuilder<> temp = IRBuilder<>(context);
     builder = &(temp);
 
@@ -57,78 +25,72 @@ code_generation::code_generation(std::string file_text) {
         this->m->print(output, nullptr);
     }
 
-    auto Filename = "output.o";
-    std::error_code EC;
-    raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
+    print_module_ll(true);
+    write_module_to_file("output.o");
 
-    if (EC) {
-        errs() << "Could not open file: " << EC.message();;
-    }
-
-    legacy::PassManager pass;
-    auto FileType = CGFT_ObjectFile;
-
-    if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
-        errs() << "TargetMachine can't emit a file of this type";
-    }
-
-    pass.run(*m);
-    dest.flush();
 }
 
+/** Program **/
 Module* code_generation::codegen_program_root(node *n) {
 
-    n->children.pop_front(); // Popping program
-    const string program_name = string("program_") + n->children.front()->val.stringValue;
-    n->children.pop_front(); // Popping program name
-    n->children.pop_front(); // Popping is
+    get_reserve_node(n,T_PROGRAM); // Popping program
+    const string program_name = string("program_") + get_reserve_node(n,T_IDENTIFIER)->val.stringValue;
+    get_reserve_node(n,T_IS); // Popping is
 
+    m = new Module(program_name, context);
+
+    initialize_for_target();
     variable_scope = new scope(builder, m);
 
-    Function* f = m->getFunction("mul");
-    if (!f)
-        f = codegen_function(n,m);
+    Function* f = codegen_program_root_function();
 
-    BasicBlock *BB = BasicBlock::Create(context, "entry", f);
-    builder->SetInsertPoint(BB);
-    block = BB;
+    BasicBlock* program_entry_bb = BasicBlock::Create(context, "entry", f);
+    builder->SetInsertPoint(program_entry_bb);
+    block = program_entry_bb;
 
-    namedValues.clear();
-    for (auto &Arg : f->args())
-        namedValues.insert_or_assign(Arg.getName().str(), &Arg);
+    // Runtime/Built-in prototypes
+    codegen_run_time_prototypes();
 
+    codegen_declaration_block(n->children.front());
+    n->children.pop_front(); // ignoring declaration block for now
 
-    if (true){
-        codegen_print_prototype(m); // Move this inside
-        codegen_scan_prototype();
-        codegen_declaration_block(n->children.front(), builder);
+    get_reserve_node(n,T_BEGIN); // Popping program
 
-        n->children.pop_front(); // ignoring declaration block for now
-        n->children.pop_front(); // Popping begin
+    codegen_statement_block(n->children.front());
+    n->children.pop_front();
 
-        codegen_statement_block(n->children.front(), builder);
-        n->children.pop_front();
+    builder->CreateRet(ConstantInt::get(context, APInt(32,0)));
 
-//        Value* temp = variable_scope->get_temp("arr")->get();
-//        builder->CreateInBoundsGEP()
-//        ConstantArray* ca = cast<ConstantArray>(temp);
-//        identifiers.insert_or_assign("words", alloca);
-        builder->CreateRet(ConstantInt::get(context, APInt(32,0)));
-//        verifyFunction(*f);
-    }
     return m;
 }
+Function* code_generation::codegen_program_root_function(){
+    std::vector<std::string> args = {};
+    std::string name = "main";
 
-void code_generation::codegen_declaration_block(node *n, IRBuilder<>* b) {
+    std::vector<Type*> Integers(args.size(),
+                                Type::getDoubleTy(context));
+    FunctionType *FT =
+            FunctionType::get(Type::getInt32Ty(context), Integers, false);
+
+    Function *f =
+            Function::Create(FT, Function::ExternalLinkage, name, m);
+
+    unsigned Idx = 0;
+    for (auto &Arg : f->args())
+        Arg.setName(args[Idx++]);
+
+    return f;
+}
+void code_generation::codegen_declaration_block(node *n) {
     for (node* x : n->children){
-        if (x->type == T_VARIABLE_DECLARATION) codegen_variable_declaration(x, b);
-        if (x->type == T_PROCEDURE_DECLARATION) codegen_function_body(x);
+        if (x->type == T_VARIABLE_DECLARATION) codegen_variable_declaration(x);
+        else if (x->type == T_PROCEDURE_DECLARATION) codegen_function_prototype(x);
     }
 }
-bool code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
+bool code_generation::codegen_statement_block(node *n) {
     bool parse_return = false;
     for (node* x : n->children){
-        if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x, b);
+        if (x->type == T_VARIABLE_ASSIGNMENT) codegen_variable_assignment(x);
         else if (x->type == T_IF_BLOCK) codegen_if_statement(x);
         else if (x->type == T_FOR_LOOP) codegen_for_statement(x);
         else if (x->type == T_RETURN_BLOCK) {
@@ -140,103 +102,158 @@ bool code_generation::codegen_statement_block(node *n, IRBuilder<>* b) {
     return parse_return;
 }
 
+/** Control Blocks **/
 void code_generation::codegen_if_statement(node* n) {
-    n->children.pop_front(); // Popping if
+    get_reserve_node(n,T_IF);
     int bool_size;
-    Value* condition = codegen_expression(n->children.front(), bool_size);
-    n->children.pop_front(); // Popping expression
-    n->children.pop_front(); // Popping then
+    Value* condition = codegen_expression(get_reserve_node(n,T_EXPRESSION), bool_size);
+    get_reserve_node(n,T_THEN);
 
-    Function* function = builder->GetInsertBlock()->getParent();
-    BasicBlock* thenBB = BasicBlock::Create(context, "then", function);
-    BasicBlock* elseBB = BasicBlock::Create(context, "else");
-    BasicBlock* mergeBB = BasicBlock::Create(context, "ifcont");
+    Function* parent_function = builder->GetInsertBlock()->getParent();
+    BasicBlock* then_block = BasicBlock::Create(context, "then", parent_function);
+    BasicBlock* else_block = BasicBlock::Create(context, "else");
+    BasicBlock* cont_block = BasicBlock::Create(context, "ifcont");
 
-    builder->CreateCondBr(condition, thenBB, elseBB);
-    builder->SetInsertPoint(thenBB);
+    builder->CreateCondBr(condition, then_block, else_block);
+    builder->SetInsertPoint(then_block);
 
-    codegen_statement_block(n->children.front(), builder);
+    codegen_statement_block(n->children.front());
     n->children.pop_front();
-    n->children.pop_front(); // Popping else if there
+    builder->CreateBr(cont_block);
+    then_block = builder->GetInsertBlock();
 
-    builder->CreateBr(mergeBB);
-    thenBB = builder->GetInsertBlock();
+    parent_function->getBasicBlockList().push_back(else_block);
+    builder->SetInsertPoint(else_block);
 
+    if (n->children.front()->type == T_ELSE){
+        get_reserve_node(n,T_ELSE);
 
-    function->getBasicBlockList().push_back(elseBB);
-    builder->SetInsertPoint(elseBB);
+        codegen_statement_block(n->children.front());
+        n->children.pop_front();
+    }
 
-    codegen_statement_block(n->children.front(), builder);
-    n->children.pop_front();
+    builder->CreateBr(cont_block);
+    else_block = builder->GetInsertBlock();
 
-    builder->CreateBr(mergeBB);
-    elseBB = builder->GetInsertBlock();
+    parent_function->getBasicBlockList().push_back(cont_block);
+    builder->SetInsertPoint(cont_block);
 
-    function->getBasicBlockList().push_back(mergeBB);
-    builder->SetInsertPoint(mergeBB);
-//    PHINode* pn = builder.CreatePHI(Type::getDoubleTy(context), 2, "iftmp");
-
-//    pn->addIncoming(thenB)
+    get_reserve_node(n,T_END);
+    get_reserve_node(n,T_IF);
 }
 void code_generation::codegen_for_statement(node *n) {
-    n->children.pop_front(); // Popping for
-    codegen_variable_assignment(n->children.front(), builder); // processing loop var
-    n->children.pop_front(); // pop loop var assignment
+    get_reserve_node(n,T_FOR);
+    codegen_variable_assignment(get_reserve_node(n,T_VARIABLE_ASSIGNMENT));
 
-    node* conditional_copy = new node(n->children.front()); // copying conditional
+    node* conditional = get_reserve_node(n,T_EXPRESSION);
+    node* conditional_copy = new node(conditional); // copying conditional
     int cond_size;
-    Value* start_conditional = codegen_expression(n->children.front(),cond_size);
-    n->children.pop_front(); // Popping expression
+    Value* start_conditional = codegen_expression(conditional,cond_size);
 
-    Function* function = builder->GetInsertBlock()->getParent();
-    BasicBlock* loopBB = BasicBlock::Create(context, "loop", function);
-    BasicBlock* continueBB = BasicBlock::Create(context, "forcont");
+    Function* parent_function = builder->GetInsertBlock()->getParent();
+    BasicBlock* loop_block = BasicBlock::Create(context, "loop", parent_function);
+    BasicBlock* cont_block = BasicBlock::Create(context, "forcont");
 
-    builder->CreateCondBr(start_conditional, loopBB, continueBB);
-    builder->SetInsertPoint(loopBB);
+    builder->CreateCondBr(start_conditional, loop_block, cont_block);
+    builder->SetInsertPoint(loop_block);
 
-    codegen_statement_block(n->children.front(), builder);
-    n->children.pop_front(); // pop statement
+    codegen_statement_block(get_reserve_node(n,T_FOR_LOOP_STATEMENT_BLOCK));
 
     Value *endVal = codegen_expression(conditional_copy, cond_size); // codegen for end expression
-    builder->CreateCondBr(endVal, loopBB, continueBB);
-    n->children.pop_front(); // Popping end
-    n->children.pop_front(); // Popping for
+    builder->CreateCondBr(endVal, loop_block, cont_block);
+    get_reserve_node(n,T_END);
+    get_reserve_node(n,T_FOR);
 
-    function->getBasicBlockList().push_back(continueBB);
-    builder->SetInsertPoint(continueBB);
+    parent_function->getBasicBlockList().push_back(cont_block);
+    builder->SetInsertPoint(cont_block);
 }
 void code_generation::codegen_return_statement(node *n) {
-    n->children.pop_front(); // Popping return
+    // TODO - type checking?
+    get_reserve_node(n,T_RETURN);// Popping return
     int cond_size;
-    builder->CreateRet(codegen_expression(n->children.front(), cond_size));
-    n->children.pop_front(); // Popping return value
+    builder->CreateRet(codegen_expression(get_reserve_node(n,T_EXPRESSION), cond_size));
+}
+void code_generation::codegen_function_prototype(node *n) {
+
+    get_reserve_node(n,T_PROCEDURE);
+    std::string name = get_reserve_node(n,T_IDENTIFIER)->val.stringValue;
+    Type* return_type = get_type(get_reserve_node(n,T_TYPE_MARK));
+
+    std::vector<std::string> arg_names;
+    std::vector<Type *> arg_types;
+    for (auto arg : get_reserve_node(n,T_PARAMETER_LIST)->children){
+        get_reserve_node(arg,T_VARIABLE);
+        arg_names.emplace_back(get_reserve_node(arg,T_IDENTIFIER)->val.stringValue);
+        get_reserve_node(arg,T_COLON);
+        arg_types.push_back(get_type(get_reserve_node(arg,T_TYPE_MARK)));
+    }
+
+    FunctionType* f_type = FunctionType::get(return_type, arg_types, false);
+    // Have to add the function to scope as Value*
+    Value* f_temp = Function::Create(f_type, Function::ExternalLinkage, name, m);
+
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
+    variable_scope = new scope(variable_scope);
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
+
+    // Have to cast function back to Function*
+    auto* f = cast<Function>(f_temp);
+
+    // Set names for all arguments.
+    unsigned Idx = 0;
+    for (auto &Arg : f->args())
+        Arg.setName(arg_names[Idx++]);
+
+    BasicBlock* func_block = BasicBlock::Create(context, "entry", f);
+    BasicBlock* current_block = builder->GetInsertBlock();
+
+    builder->SetInsertPoint(func_block);
+
+    for (auto &Arg : f->args()){
+        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE);
+    }
+
+
+    codegen_declaration_block(get_reserve_node(n,T_PROCEDURE_DECLARATION_BLOCK));
+
+    get_reserve_node(n,T_BEGIN);
+
+    if (!codegen_statement_block(get_reserve_node(n,T_PROCEDURE_STATEMENT_BLOCK))){
+        throw runtime_error(string("Procedure '") + name + "' must contain a return statement.");
+    }
+
+    builder->SetInsertPoint(current_block);
+
+    variable_scope = variable_scope->get_parent();
+    get_reserve_node(n,T_END);
+    get_reserve_node(n,T_PROCEDURE);
 }
 
-void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
+/** Variables **/
+void code_generation::codegen_variable_declaration(node *n) {
     bool is_global = false;
     if (n->children.front()->type == T_GLOBAL) {
         is_global = true;
-        n->children.pop_front(); // global
+        get_reserve_node(n,T_GLOBAL);
     }
 
-    n->children.pop_front(); // variable
-    string s = n->children.front()->val.stringValue;
-    n->children.pop_front(); // variable name
-    n->children.pop_front(); // colon
+    get_reserve_node(n,T_VARIABLE);
+    string s = get_reserve_node(n,T_IDENTIFIER)->val.stringValue;
+    get_reserve_node(n,T_COLON);
 
-
-    Type* type = get_type(n->children.front());
+    Type* type = get_type(get_reserve_node(n,T_TYPE_MARK));
     Type* element_type = type;
-    n->children.pop_front();
+
     int size = 1;
     variable_inst::VARIABLE_CLASS clazz = variable_inst::VARIABLE_CLASS::INSTANCE;
+
     if (!n->children.empty()) {
-        n->children.pop_front(); // [
+        get_reserve_node(n,T_LBRACKET);
+
         int size_size;
-        size = cast<ConstantInt>(codegen_expression(n->children.front(), size_size))->getZExtValue();
-        n->children.pop_front(); // size
-        n->children.pop_front(); // ]
+        size = cast<ConstantInt>(codegen_expression(get_reserve_node(n,T_EXPRESSION), size_size))->getZExtValue();
+        get_reserve_node(n,T_RBRACKET);
+
         type = ArrayType::get(type, size);
         element_type = type->getArrayElementType();
         clazz = variable_inst::VARIABLE_CLASS::ARRAY_INSTANCE;
@@ -244,166 +261,81 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
 
     Value* variable_ptr;
     if (is_global) {
-
         variable_ptr = new GlobalVariable(*m,
                                  type,
                                  false,
                                  llvm::GlobalValue::CommonLinkage,
                                  Constant::getNullValue(type),
                                  s);
-    } else {
-        variable_ptr = builder->CreateAlloca(type, 0, s.c_str());
+    }
+    else {
+        variable_ptr = builder->CreateAlloca(type, nullptr, s);
     }
 
     variable_scope->add(s, variable_ptr, element_type, clazz, size);
 }
-void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
-    string s = n->children.front()->val.stringValue;
+void code_generation::codegen_variable_assignment(node *n) {
 
-    n->children.pop_front();
+    string s = get_reserve_node(n,T_IDENTIFIER)->val.stringValue;
+
     Value* index = nullptr;
 
     bool is_array_index = false;
 
-    Function* function = nullptr;
-    BasicBlock* thenBB = nullptr;
-    BasicBlock* elseBB = nullptr;
-    BasicBlock* mergeBB = nullptr;
+    // This stuff only matters if is_array_index = true;
+    Function* parent_function = nullptr;
+    BasicBlock* valid_index_block = nullptr;
+    BasicBlock* invalid_index_block = nullptr;
+    BasicBlock* cont_block = nullptr;
 
     if (n->children.front()->type == T_LBRACKET){
         is_array_index = true;
+        get_reserve_node(n,T_LBRACKET);
 
-        n->children.pop_front();
         int temp_size;
-        index = codegen_expression(n->children.front(), temp_size);
-        n->children.pop_front();
-        n->children.pop_front();
+        index = codegen_expression(get_reserve_node(n,T_EXPRESSION), temp_size);
+        get_reserve_node(n,T_RBRACKET);
 
         Value* lhs = variable_scope->get_temp(s + "_size")->get();
-        Value* cond = b->CreateICmpSGT(lhs, index);
+        Value* cond = builder->CreateICmpSGT(lhs, index);
 
-        function = b->GetInsertBlock()->getParent();
-        thenBB = BasicBlock::Create(context, "validIndex", function);
-        elseBB = BasicBlock::Create(context, "invalidIndex");
-        mergeBB = BasicBlock::Create(context, "ifcont");
+        parent_function = builder->GetInsertBlock()->getParent();
+        valid_index_block = BasicBlock::Create(context, "validIndex", parent_function);
+        invalid_index_block = BasicBlock::Create(context, "invalidIndex");
+        cont_block = BasicBlock::Create(context, "ifcont");
 
-        b->CreateCondBr(cond, thenBB, elseBB);
-        b->SetInsertPoint(thenBB);
+        builder->CreateCondBr(cond, valid_index_block, invalid_index_block);
+        builder->SetInsertPoint(valid_index_block);
 
     }
 
-        n->children.pop_front();
+    get_reserve_node(n,T_COLON_EQUALS);
 
-        int exp_size;
-        Value* v =  codegen_expression(n->children.front(),exp_size);
-        variable_scope->set(s, v,exp_size, index);
-
+    int exp_size;
+    Value* v =  codegen_expression(get_reserve_node(n,T_EXPRESSION),exp_size);
+    variable_scope->set(s, v,exp_size, index);
 
     if (is_array_index){
-        builder->CreateBr(mergeBB);
-        thenBB = builder->GetInsertBlock();
+        builder->CreateBr(cont_block);
+        valid_index_block = builder->GetInsertBlock();
 
-        function->getBasicBlockList().push_back(elseBB);
-        builder->SetInsertPoint(elseBB);
+        parent_function->getBasicBlockList().push_back(invalid_index_block);
+        builder->SetInsertPoint(invalid_index_block);
 
+        // TODO - throw runtime in llvm
         int temp = 1;
-        codegen_print_string(m, codegen_literal_string("Invalid array index", temp));
+        codegen_print_string(codegen_literal_string("Invalid array index", temp));
 
+        builder->CreateBr(cont_block);
+        invalid_index_block = builder->GetInsertBlock();
 
-        builder->CreateBr(mergeBB);
-        elseBB = builder->GetInsertBlock();
-
-        function->getBasicBlockList().push_back(mergeBB);
-        builder->SetInsertPoint(mergeBB);
-
+        parent_function->getBasicBlockList().push_back(cont_block);
+        builder->SetInsertPoint(cont_block);
     }
 
 }
 
-Function *code_generation::codegen_function(node *n, Module* m) {
-
-    std::vector<std::string> args = {};
-    std::string name = "main";
-
-    std::vector<Type*> Integers(args.size(),
-                               Type::getDoubleTy(context));
-    FunctionType *FT =
-            FunctionType::get(Type::getInt32Ty(context), Integers, false);
-
-    Function *F =
-            Function::Create(FT, Function::ExternalLinkage, name, m);
-
-    unsigned Idx = 0;
-    for (auto &Arg : F->args())
-        Arg.setName(args[Idx++]);
-
-    return F;
-}
-
-Value *code_generation::codegen_function_body(node *n) {
-
-    n->children.pop_front(); // Popping procedure
-    std::string name = n->children.front()->val.stringValue;
-    n->children.pop_front(); // Popping name
-    Type* return_type = get_type(n->children.front());
-    n->children.pop_front(); // Popping return type
-
-    std::vector<std::string> arg_names;
-    std::vector<Type *> arg_types;
-    for (auto arg : n->children.front()->children){
-        arg->children.pop_front(); // pop variable
-        arg_names.emplace_back(arg->children.front()->val.stringValue);
-        arg->children.pop_front(); // pop var name
-        arg->children.pop_front(); // pop :
-        arg_types.push_back(get_type(arg->children.front()));
-        arg->children.pop_front(); // pop type
-    }
-
-    FunctionType *FT = FunctionType::get(return_type, arg_types, false);
-
-    Value* f_temp = Function::Create(FT, Function::ExternalLinkage, name, m);
-
-    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
-    variable_scope = new scope(variable_scope);
-    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION);
-
-    Function* f = cast<Function>(f_temp);
-
-    // Set names for all arguments.
-    unsigned Idx = 0;
-    for (auto &Arg : f->args())
-        Arg.setName(arg_names[Idx++]);
-
-
-    functions.insert_or_assign(name, f);
-
-    BasicBlock *BB = BasicBlock::Create(context, "entry", f);
-    BasicBlock* currentBlock = builder->GetInsertBlock();
-
-    builder->SetInsertPoint(BB);
-
-    namedValues.clear();
-    for (auto &Arg : f->args()){
-        variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE);
-    }
-
-    n->children.pop_front(); // Popping params
-    codegen_declaration_block(n->children.front(), builder);
-    n->children.pop_front(); // Popping declaration block
-
-    n->children.pop_front(); // Popping begin
-
-    if (!codegen_statement_block(n->children.front(), builder)){
-        throw runtime_error(string("Procedure '") + name + "' must contain a return statement.");
-    }
-    n->children.pop_front();
-
-    builder->SetInsertPoint(currentBlock);
-
-    variable_scope = variable_scope->get_parent();
-    return codegen_literal_integer(0);
-}
-
+/** Literals **/
 Value *code_generation::codegen_literal_integer(int n) {
     return ConstantInt::get(Type::getInt32Ty(context), APInt(32, n));
 }
@@ -428,22 +360,19 @@ Value *code_generation::codegen_literal_string(const std::string& n, int& size) 
     return ptr;
 }
 
-Value *code_generation::codegen_literal_array(std::vector<Value*> values) {
-    auto arr = ConstantDataArray::get(context, values);
-    return arr;
-}
-
+/** Expressions **/
 Value *code_generation::codegen_expression(node *n, int& size,  Value* lhs) {
 
     bool is_not_l = false;
     if (!n->children.empty() && n->children.front()->type == T_NOT){
-        n->children.pop_front();  // Pop not
+        get_reserve_node(n,T_NOT);
         is_not_l = true;
     }
 
     if (lhs == nullptr){
-        lhs = is_not_l ? builder->CreateNot(codegen_arith_op(n->children.front(), size)) : codegen_arith_op(n->children.front(),size);
-        n->children.pop_front();
+        lhs = is_not_l ?
+                builder->CreateNot(codegen_arith_op(get_reserve_node(n,T_ARITH_OP), size)) :
+                codegen_arith_op(get_reserve_node(n,T_ARITH_OP),size);
     }
 
     if (n->children.empty())
@@ -454,16 +383,14 @@ Value *code_generation::codegen_expression(node *n, int& size,  Value* lhs) {
 
     bool is_not_r = false;
     if (n->children.front()->type == T_NOT){
-        n->children.pop_front(); // Pop not
+        get_reserve_node(n,T_NOT);
         is_not_r = true;
     }
     int rhs_size;
-    Value* rhs = is_not_r ? builder->CreateNot(codegen_arith_op(n->children.front(),rhs_size)) : codegen_arith_op(n->children.front(),rhs_size);
-    n->children.pop_front(); // Pop RHS
+    Value* rhs = is_not_r ?
+            builder->CreateNot(codegen_arith_op(get_reserve_node(n,T_ARITH_OP),rhs_size)) :
+            codegen_arith_op(get_reserve_node(n,T_ARITH_OP),rhs_size);
 
-    if (size != rhs_size){
-        // Do something
-    }
     // check flips
     switch (operation) {
         case T_AND:
@@ -482,23 +409,17 @@ Value *code_generation::codegen_arith_op(node *n, int& size,  Value* lhs) {
     if (n->children.empty())
         return lhs;
     if (n->children.size() == 1)
-        return codegen_relation(n->children.front(), size);
+        return codegen_relation(get_reserve_node(n,T_RELATION), size);
 
     if (lhs == nullptr){
-        lhs = codegen_relation(n->children.front(), size);
-        n->children.pop_front();
+        lhs = codegen_relation(get_reserve_node(n,T_RELATION), size);
     }
 
     int operation = n->children.front()->type;
     n->children.pop_front();
 
     int rhs_size;
-    Value* rhs = codegen_relation(n->children.front(), rhs_size);
-    n->children.pop_front();
-
-    if (size != rhs_size){
-        // Do something
-    }
+    Value* rhs = codegen_relation(get_reserve_node(n,T_RELATION), rhs_size);
 
     switch (operation) {
         case T_ADD:
@@ -519,20 +440,17 @@ Value *code_generation::codegen_relation(node *n, int& size, Value* lhs) {
     if (n->children.empty())
         return lhs;
     if (n->children.size() == 1)
-        return codegen_term(n->children.front(), size);
+        return codegen_term(get_reserve_node(n,T_TERM), size);
 
     if (lhs == nullptr){
-        lhs = codegen_term(n->children.front(), size);
-        n->children.pop_front(); // Pop lhs
+        lhs = codegen_term(get_reserve_node(n,T_TERM), size);
     }
     int operation = n->children.front()->type;
     n->children.pop_front(); // Pop operation
+
     int rhs_size;
-    Value* rhs = codegen_term(n->children.front(), rhs_size);
-    if (size != rhs_size){
-        // Do something
-    }
-    n->children.pop_front(); // Pop rhs
+    Value* rhs = codegen_term(get_reserve_node(n,T_TERM), rhs_size);
+
     switch (operation) {
         case T_L_THAN:
             return codegen_term(n,size, operation_block(
@@ -568,21 +486,17 @@ Value *code_generation::codegen_term(node *n, int& size, Value* lhs) {
     if (n->children.empty())
         return lhs;
     if (n->children.size() == 1)
-        return codegen_factor(n->children.front(), size);
+        return codegen_factor(get_reserve_node(n,T_FACTOR), size);
 
     if (lhs == nullptr){
-        lhs = codegen_factor(n->children.front(), size);
-        n->children.pop_front();
+        lhs = codegen_factor(get_reserve_node(n,T_FACTOR), size);
     }
 
     int operation = n->children.front()->type;
     n->children.pop_front();
+
     int rhs_size;
-    Value* rhs = codegen_factor(n->children.front(),rhs_size);
-    if (size != rhs_size){
-        // Do something
-    }
-    n->children.pop_front();
+    Value* rhs = codegen_factor(get_reserve_node(n,T_FACTOR),rhs_size);
 
     switch (operation) {
         case T_MULTIPLY:
@@ -628,7 +542,8 @@ Value *code_generation::codegen_factor(node *n, int& size) {
             auto vi = variable_scope->get_temp(x->val.stringValue);
             return_val = vi->get();
             size = vi->get_size();
-        } else {
+        }
+        else {
             int index_size;
             Value* index = codegen_expression(n->children.front(),index_size);
 
@@ -655,8 +570,7 @@ Value *code_generation::codegen_factor(node *n, int& size) {
             builder->SetInsertPoint(elseBB);
 
             int temp_size = 0;
-            codegen_print_string(m, codegen_literal_string("Invalid array index", temp_size));
-
+            codegen_print_string(codegen_literal_string("Invalid array index", temp_size));
 
             builder->CreateBr(mergeBB);
             elseBB = builder->GetInsertBlock();
@@ -671,17 +585,16 @@ Value *code_generation::codegen_factor(node *n, int& size) {
         size = 1;
         int temp_size = 1;
         if (string("putinteger") == functionName) {
-            return_val = codegen_print_integer(m,codegen_expression(x->children.front(), temp_size));
+            return_val = codegen_print_integer(codegen_expression(x->children.front(), temp_size));
         }
         else if (string("putfloat") == functionName){
-            return_val = codegen_print_double(m,codegen_expression(x->children.front(), temp_size));
+            return_val = codegen_print_double(codegen_expression(x->children.front(), temp_size));
         }
         else if (string("putstring") == functionName) {
-            return_val = codegen_print_string(m, codegen_expression(x->children.front(), temp_size));
+            return_val = codegen_print_string(codegen_expression(x->children.front(), temp_size));
         }
         else if (string("putbool") == functionName) {
-            Value *v = codegen_expression(x->children.front(), temp_size);
-            return_val = codegen_print_boolean(m, v);
+            return_val = codegen_print_boolean(codegen_expression(x->children.front(), temp_size));
         }
         else if (string("getinteger") == functionName){
             return_val = codegen_scan_integer();
@@ -728,63 +641,20 @@ Value *code_generation::codegen_factor(node *n, int& size) {
             : return_val;
 }
 
-void code_generation::codegen_print_prototype(Module *mod) {
+/** Run Time Functions **/
+void code_generation::codegen_run_time_prototypes() {
 
-
-    Function* printer = mod->getFunction("printf");
+    Function* printer = m->getFunction("printf");
     if (printer == nullptr){
         std::vector<Type *> args;
         args.push_back(Type::getInt8PtrTy(context));
 
         FunctionType *printfType = FunctionType::get(builder->getInt32Ty(), args, true);
-        Function::Create(printfType, Function::ExternalLinkage, "printf",
-                         mod);
+        Function::Create(printfType, Function::ExternalLinkage, "printf", m);
     }
-}
-Value* code_generation::codegen_print_base(Module* mod, Value* v, Value* formatStr) {
-    std::vector<Value *> printArgs;
-    printArgs.push_back(formatStr);
-    printArgs.push_back(v);
 
-    builder->CreateCall(mod->getFunction("printf"), printArgs);
-    return codegen_literal_boolean(true);
-}
-Value* code_generation::codegen_print_string(Module *mod, Value *v) {
-    if (!namedValues.contains(".str")){
-        Value *formatStr = builder->CreateGlobalStringPtr("%s\n", ".str");
-        namedValues.insert_or_assign(".str", formatStr);
-    }
-    return codegen_print_base(mod,v, namedValues.at(".str"));
-}
-Value* code_generation::codegen_print_double(Module *mod, Value *v) {
-    if (!namedValues.contains(".double")){
-        Value *formatStr = builder->CreateGlobalStringPtr("%g\n", ".double");
-        namedValues.insert_or_assign(".double", formatStr);
-    }
-    return codegen_print_base(mod, v, namedValues.at(".double"));
-}
-Value* code_generation::codegen_print_integer(Module *mod, Value *v) {
-    if (!namedValues.contains(".int")){
-        Value *formatStr = builder->CreateGlobalStringPtr("%d\n", ".int");
-        namedValues.insert_or_assign(".int", formatStr);
-    }
-    // change integers to actually be ints ... maybe
-    return codegen_print_base(mod, v, namedValues.at(".int"));
-}
-Value* code_generation::codegen_print_boolean(Module *mod, Value *v) {
-    if (!namedValues.contains(".int")){
-        Value *formatStr = builder->CreateGlobalStringPtr("%d\n", ".int");
-        namedValues.insert_or_assign(".int", formatStr);
-    }
-    // change integers to actually be ints ... maybe
-    return codegen_print_base(mod, v, namedValues.at(".int"));
-}
-
-void code_generation::codegen_scan_prototype() {
-
-
-    Function* printer = m->getFunction("scanf");
-    if (printer == nullptr){
+    Function* scan = m->getFunction("scanf");
+    if (scan == nullptr){
         std::vector<Type *> args;
         args.push_back(Type::getInt8PtrTy(context));
 
@@ -818,117 +688,14 @@ void code_generation::codegen_scan_prototype() {
         FunctionType *printfType = FunctionType::get(builder->getDoubleTy(), args, true);
         Function::Create(printfType, Function::ExternalLinkage, "sqrt", m);
     }
-//    Function* stringCompareLLVM = m->getFunction("stringCompareLLVM");
-//    if (scanString == nullptr){
-//        std::vector<Type *> args;
-//        args.push_back(Type::getInt8PtrTy(context));
-//        args.push_back(Type::getInt8PtrTy(context));
-//
-//        FunctionType *printfType = FunctionType::get(builder->getInt1Ty(), args, true);
-//        Function* f = Function::Create(printfType, Function::ExternalLinkage, "stringCompareLLVM", m);
-//
-//        BasicBlock *BB = BasicBlock::Create(context, "entry", f);
-//        BasicBlock* currentBlock = builder->GetInsertBlock();
-//
-//        builder->SetInsertPoint(BB);
-//
-//        vector<Value*> v;
-//        for (auto &Arg : f->args()){
-//            v.push_back(&Arg);
-////            variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE);
-//        }
-//
-//        Function* function = builder->GetInsertBlock()->getParent();
-//        BasicBlock* mainBlock = BasicBlock::Create(context, "startBl");
-//        BasicBlock* retFalse = BasicBlock::Create(context, "retFalse");
-//        BasicBlock* retTrue = BasicBlock::Create(context, "retTrue");
-//        BasicBlock* callAgain = BasicBlock::Create(context, "callAgain");
-//        BasicBlock* secondTier = BasicBlock::Create(context, "secondTier");
-//
-//        /** Main **/
-//        builder->SetInsertPoint(mainBlock);
-//        Value* vv = v.at(0);
-//        Value* lc = builder->CreateLoad(vv);
-//        Value* rc = builder->CreateLoad(v.at(1));
-//
-//        Value* l1 = builder->CreateICmpEQ(lc, ConstantInt::get(builder->getInt8Ty(), APInt(8,0)));
-//        Value* r1 = builder->CreateICmpEQ(rc, ConstantInt::get(builder->getInt8Ty(), APInt(8,0)));
-//
-//        Value* cond = builder->CreateAnd(l1,r1);
-//        builder->CreateCondBr(cond, retTrue, secondTier);
-//
-//        /** Return True **/
-//        mainBlock = builder->GetInsertBlock();
-//        function->getBasicBlockList().push_back(retTrue);
-//        builder->SetInsertPoint(retTrue);
-//
-//        builder->CreateRet(codegen_literal_boolean(true));
-//
-//        /** Second Level **/
-//        retTrue = builder->GetInsertBlock();
-//        function->getBasicBlockList().push_back(secondTier);
-//        builder->SetInsertPoint(secondTier);
-//
-//        cond = builder->CreateNot(builder->CreateOr(l1,r1));
-//        builder->CreateCondBr(cond, retFalse, callAgain);
-//
-//        /** Return False **/
-//        secondTier = builder->GetInsertBlock();
-//        function->getBasicBlockList().push_back(retFalse);
-//        builder->SetInsertPoint(retFalse);
-//
-//        /** Call Again **/
-//        retFalse = builder->GetInsertBlock();
-//        function->getBasicBlockList().push_back(callAgain);
-//        builder->SetInsertPoint(callAgain);
-//
-////        builder->getInt8Ty()->get
-//        Value* newL = builder->CreateAdd(v.at(0), ConstantInt::get(builder->getInt8Ty(), APInt(8,8)));
-//        Value* newR = builder->CreateAdd(v.at(1), ConstantInt::get(builder->getInt8Ty(), APInt(8,8)));
-//        vector<Value*> newArgs = {newL,newR};
-//        builder->CreateRet(builder->CreateCall(f, newArgs));
-//
-//
-//
-//        cond = builder->CreateICmpEQ(builder->CreateLoad(v.at(0)), builder->CreateLoad(v.at(1)));
-//    }
 }
-void code_generation::codegen_scan_string_prototype() {
+Value* code_generation::codegen_print_base(Value* v, Value* formatStr) {
+    std::vector<Value *> printArgs;
+    printArgs.push_back(formatStr);
+    printArgs.push_back(v);
 
-    std::vector<std::string> arg_names = {"full_str", "size"};
-    std::string name = "shorten_string";
-
-    std::vector<Type *> arg_types = {
-            ArrayType::get(Type::getInt8Ty(context), 256),
-            Type::getInt32Ty(context)
-    };
-
-    FunctionType *FT = FunctionType::get(Type::getDoubleTy(context), arg_types, false);
-
-    Function* f = Function::Create(FT, Function::ExternalLinkage, name, m);
-
-    // Set names for all arguments.
-    unsigned Idx = 0;
-    for (auto &Arg : f->args())
-        Arg.setName(arg_names[Idx++]);
-
-    functions.insert_or_assign(name, f);
-
-    BasicBlock *BB = BasicBlock::Create(context, "entry", f);
-    BasicBlock* currentBlock = builder->GetInsertBlock();
-
-    builder->SetInsertPoint(BB);
-
-    namedValues.clear();
-    for (auto &Arg : f->args()){
-//        Value* temp = &Arg;
-//        auto
-//        identifiers.insert_or_assign(std::string(Arg.getName()), )
-        namedValues[std::string(Arg.getName())] = &Arg;
-    }
-
-//    CallInst::CreateMa
-
+    builder->CreateCall(m->getFunction("printf"), printArgs);
+    return codegen_literal_boolean(true);
 }
 Value *code_generation::codegen_scan_base(Type* t, Value *formatStr) {
     AllocaInst* tempInst = builder->CreateAlloca(t, 0, "temp");
@@ -940,17 +707,12 @@ Value *code_generation::codegen_scan_base(Type* t, Value *formatStr) {
     builder->CreateCall(m->getFunction("scanf"), printArgs);
     return builder->CreateLoad(tempInst);
 }
-Value *code_generation::codegen_scan_string() {
-
-    std::vector<Value *> printArgs;
-    return builder->CreateCall(m->getFunction("scanString"), printArgs);
-}
-Value *code_generation::codegen_scan_double() {
-    if (!namedValues.contains(".double_sc")){
-        Value *formatStr = builder->CreateGlobalStringPtr("%lf", ".double_sc");
-        namedValues.insert_or_assign(".double_sc", formatStr);
+Value* code_generation::codegen_print_integer(Value *v) {
+    if (!namedValues.contains(".int")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%d\n", ".int");
+        namedValues.insert_or_assign(".int", formatStr);
     }
-    return codegen_scan_base(Type::getDoubleTy(context),namedValues.at(".double_sc"));
+    return codegen_print_base(v, namedValues.at(".int"));
 }
 Value *code_generation::codegen_scan_integer() {
     if (!namedValues.contains(".integer_sc")){
@@ -959,6 +721,28 @@ Value *code_generation::codegen_scan_integer() {
     }
     return codegen_scan_base(Type::getInt32Ty(context),namedValues.at(".integer_sc"));
 }
+Value* code_generation::codegen_print_double(Value *v) {
+    if (!namedValues.contains(".double")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%g\n", ".double");
+        namedValues.insert_or_assign(".double", formatStr);
+    }
+    return codegen_print_base(v, namedValues.at(".double"));
+}
+Value *code_generation::codegen_scan_double() {
+    if (!namedValues.contains(".double_sc")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%lf", ".double_sc");
+        namedValues.insert_or_assign(".double_sc", formatStr);
+    }
+    return codegen_scan_base(Type::getDoubleTy(context),namedValues.at(".double_sc"));
+}
+Value* code_generation::codegen_print_boolean(Value *v) {
+    if (!namedValues.contains(".int")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%d\n", ".int");
+        namedValues.insert_or_assign(".int", formatStr);
+    }
+    // change integers to actually be ints ... maybe
+    return codegen_print_base(v, namedValues.at(".int"));
+}
 Value *code_generation::codegen_scan_bool() {
     if (!namedValues.contains(".integer_sc")){
         Value *formatStr = builder->CreateGlobalStringPtr("%u", ".integer_sc");
@@ -966,17 +750,25 @@ Value *code_generation::codegen_scan_bool() {
     }
     return codegen_scan_base(Type::getInt1Ty(context),namedValues.at(".integer_sc"));
 }
-
+Value* code_generation::codegen_print_string(Value *v) {
+    if (!namedValues.contains(".str")){
+        Value *formatStr = builder->CreateGlobalStringPtr("%s\n", ".str");
+        namedValues.insert_or_assign(".str", formatStr);
+    }
+    return codegen_print_base(v, namedValues.at(".str"));
+}
+Value *code_generation::codegen_scan_string() {
+    std::vector<Value *> args;
+    return builder->CreateCall(m->getFunction("scanString"), args);
+}
 Value *code_generation::codegen_sqrt(Value* v){
-//    AllocaInst* tempInst = builder->CreateAlloca(t, 0, "temp");
-    std::vector<Value *> printArgs;
+    std::vector<Value *> args;
+    args.push_back(v);
 
-    printArgs.push_back(v);
-
-
-    return builder->CreateCall(m->getFunction("sqrt"), printArgs);
+    return builder->CreateCall(m->getFunction("sqrt"), args);
 }
 
+/** HELPERS **/
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                                         Value* lhs, int &lhs_size,
                                         Value* rhs, int rhs_size,
@@ -1091,7 +883,6 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
     return nullptr;
 
 }
-
 Type *code_generation::get_type(node *n) {
     switch (n->children.front()->type) {
         case T_INTEGER_TYPE: return Type::getInt32Ty(context);
@@ -1101,39 +892,82 @@ Type *code_generation::get_type(node *n) {
     }
     return nullptr;
 }
-Type *code_generation::get_array_type(node *n) {
+node *code_generation::get_reserve_node(node* n, int type) {
+    if (n->children.front()->type == type){
+        node* temp = n->children.front();
+        n->children.pop_front();
+        return temp;
+    }
+    throw_runtime_template("Expected type " + std::to_string(type) + ", but received " +  std::to_string(n->children.front()->type) + " instead.");
     return nullptr;
 }
-Value *code_generation::generateValue(Module *m) {
-    //0. Defs
-    auto str = string("Butt");
-    auto charType = llvm::IntegerType::get(context, 8);
-    auto arrayType = ArrayType::get(charType, str.length() + 1);
 
-    //1. Initialize chars vector
-    std::vector<llvm::Constant *> chars(str.length());
-    for(unsigned int i = 0; i < str.size(); i++) {
-        chars[i] = llvm::ConstantInt::get(charType, str[i]);
+/** System Code **/
+void code_generation::initialize_for_target() {
+    auto TargetTriple = sys::getDefaultTargetTriple();
+
+    InitializeAllTargetInfos();
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+//    InitializeAllAsmParsers();
+    InitializeAllAsmPrinters();
+
+    std::string Error;
+    auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
+
+    auto CPU = "generic";
+    auto Features = "";
+
+    TargetOptions opt;
+    auto RM = Optional<Reloc::Model>();
+    targetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+    m->setDataLayout(targetMachine->createDataLayout());
+    m->setTargetTriple(TargetTriple);
+
+
+    // Print an error and exit if we couldn't find the requested target.
+    // This generally occurs if we've forgotten to initialise the
+    // TargetRegistry or we have a bogus target triple.
+    if (!Target) {
+        errs() << Error;
+        cout << "ERROR";
+    }
+}
+void code_generation::print_module_ll(bool should_print) {
+    if (should_print){
+        llvm::raw_ostream& output = llvm::outs();
+        this->m->print(output, nullptr);
+    }
+}
+void code_generation::write_module_to_file(string file_name) {
+
+    std::error_code EC;
+    raw_fd_ostream dest(file_name, EC, sys::fs::OF_None);
+
+    if (EC) {
+        errs() << "Could not open file: " << EC.message();;
     }
 
-    //1b. add a zero terminator too
-    chars.push_back(llvm::ConstantInt::get(charType, 0));
+    legacy::PassManager pass;
+    auto FileType = CGFT_ObjectFile;
 
+    if (targetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+        errs() << "TargetMachine can't emit a file of this type";
+    }
 
-    //2. Initialize the string from the characters
-    auto stringType = llvm::ArrayType::get(charType, chars.size());
-
-    //3. Create the declaration statement
-    auto globalDeclaration = (llvm::GlobalVariable*) m->getOrInsertGlobal(".str", stringType);
-//    globalDeclaration->setInitializer(llvm::ConstantArray::get_temp(stringType, chars));
-//    globalDeclaration->setConstant(true);
-//    globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
-//    globalDeclaration->setUnnamedAddr (llvm::GlobalValue::UnnamedAddr::Global);
-
-
-
-    //4. Return a cast to an i8*
-//    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
-    return ConstantArray::get(arrayType, chars);
+    pass.run(*m);
+    dest.flush();
 }
+
+/** Errors **/
+void code_generation::throw_runtime_template(const string &message) const {
+        throw runtime_error("Codegegen Error: " + message);
+}
+
+
+
+
+
+
 

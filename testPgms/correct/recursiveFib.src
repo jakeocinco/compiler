@@ -4,13 +4,13 @@ global variable x : integer;
 variable i : integer;
 variable max : integer;
 variable out: bool;
-variable blank: integer;
+variable blank: integer[2];
 
 procedure Fib : integer(variable val :integer)
 
 	procedure Sub : integer(variable val1 : integer)
 		begin
-		    blank := 0;
+		    blank[0] := 0;
 			return val1 - 1;
 		end procedure;
 

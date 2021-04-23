@@ -50,7 +50,7 @@ node* parser::parse_program() {
 
     n->newChild(expecting_reserved_word(T_END, "end"));
     n->newChild(expecting_reserved_word(T_PROGRAM, "program"));
-
+    expecting_reserved_word(T_PERIOD, ".");
     return n;
 }
 node* parser::parse_program_declaration_block() {
@@ -623,8 +623,6 @@ node*  parser::expecting_literal(int expected_type) {
         consume_token();
         return n;
     }
-
-    // TODO - enums and custom types
 
     throw_unexpected_token_wanted_literal(current.val.stringValue);
     return nullptr;

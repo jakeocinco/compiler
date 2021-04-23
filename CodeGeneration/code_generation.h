@@ -71,6 +71,8 @@ private:
     IRBuilder<>* builder;
     BasicBlock* block;
 
+    TargetMachine* targetMachine;
+
     std::map<std::string, Function*> functions;
 //    ()(llvm::Value *, llvm::Value *, const llvm::Twine &, bool, bool
     typedef  Value* (llvm::IRBuilderBase::*memFn)(llvm::Value *, llvm::Value *, const llvm::Twine &);
@@ -83,7 +85,6 @@ private:
         Value* rhs;
     };
 
-    void write_to_file(Module* m);
 
     node* tree;
     scope* variable_scope;
@@ -94,59 +95,64 @@ private:
     IRBuilder<>* b2;
     Value* codegen(node* n);
 
+    /** Program **/
     Module* codegen_program_root(node* n);
-    void codegen_declaration_block(node* n, IRBuilder<>* b);
-    bool codegen_statement_block(node* n, IRBuilder<>* b);
+    Function* codegen_program_root_function();
+    void codegen_declaration_block(node* n);
+    bool codegen_statement_block(node* n);
 
-    Function* codegen_function(node* n, Module* m);
-    Value* codegen_function_body(node* n);
-
-    void codegen_variable_declaration(node* n, IRBuilder<>* b);
-    void codegen_variable_assignment(node* n, IRBuilder<>* b);
-
-    Type* get_type(node *n);
-    Type* get_array_type(node *n);
-
+    /** Control Blocks **/
     void codegen_if_statement(node* n);
     void codegen_for_statement(node* n);
     void codegen_return_statement(node* n);
+    void codegen_function_prototype(node* n);
 
+    /** Variables **/
+    void codegen_variable_declaration(node* n);
+    void codegen_variable_assignment(node* n);
+
+    /** Literals **/
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
     Value* codegen_literal_boolean(bool n);
     Value* codegen_literal_string(const std::string& n, int& size);
 
-    Value* codegen_literal_array(std::vector<Value*> values);
-
+    /** Expressions **/
     Value* codegen_expression(node *n, int& size, Value* lhs = nullptr);
     Value* codegen_arith_op(node *n, int& size, Value* lhs = nullptr);
     Value* codegen_relation(node *n, int& size, Value* lhs = nullptr);
     Value* codegen_term(node *n, int& size, Value* lhs = nullptr);
     Value* codegen_factor(node *n, int& size);
 
-    void codegen_print_prototype(Module *mod);
-    Value* codegen_print_base(Module* mod, Value* v, Value* formatStr);
-    Value* codegen_print_string(Module* mod, Value* v);
-    Value* codegen_print_double(Module* mod, Value* v);
-    Value* codegen_print_integer(Module* mod, Value* v);
-    Value* codegen_print_boolean(Module* mod, Value* v);
-
-    void codegen_scan_prototype();
-    void codegen_scan_string_prototype();
+    /** Run Time Functions **/
+    void codegen_run_time_prototypes();
+    Value* codegen_print_base(Value* v, Value* formatStr);
     Value* codegen_scan_base(Type* t, Value* formatStr);
-
-    Value* codegen_scan_string();
-    Value* codegen_scan_double();
+    Value* codegen_print_integer(Value* v);
     Value* codegen_scan_integer();
+    Value* codegen_print_double(Value* v);
+    Value* codegen_scan_double();
+    Value* codegen_print_boolean(Value* v);
     Value* codegen_scan_bool();
-
+    Value* codegen_print_string(Value* v);
+    Value* codegen_scan_string();
     Value* codegen_sqrt(Value* v);
 
+    /** Helpers **/
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, int &lhs_size,
                            Value* rhs,  int rhs_size,
                            bool is_comparison = false);
-    Value* generateValue(Module* m);
+    Type* get_type(node *n);
+    node* get_reserve_node(node* n, int type);
+
+    /** system Code **/
+    void initialize_for_target();
+    void print_module_ll(bool should_print);
+    void write_module_to_file(std::string file_name);
+
+    /** Errors **/
+    void throw_runtime_template(const std::string& message) const;
 };
 
 
