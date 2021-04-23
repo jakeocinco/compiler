@@ -17,3 +17,16 @@ char* scanString() {
     }
     return good_string;
 };
+
+int stringCompare(char* l, char* r){
+    if (*l == '\00' && *r == '\00' ){
+        return 1;
+    }
+    if (*l == '\00' || *r == '\00' ){
+        return 0;
+    }
+    else if (*l == *r) {
+        return stringCompare(++l, ++r);
+    }
+    return 0;
+}

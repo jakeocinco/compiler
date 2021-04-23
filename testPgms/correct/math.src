@@ -27,7 +27,7 @@ end procedure;
 
 begin
 
-value := Fib(15);
+value := Fib(5);
 out := putInteger(value);
 
 end program.

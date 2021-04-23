@@ -114,7 +114,7 @@ private:
     Value* codegen_literal_integer(int n);
     Value* codegen_literal_float(double n);
     Value* codegen_literal_boolean(bool n);
-    Value* codegen_literal_string(const std::string& n);
+    Value* codegen_literal_string(const std::string& n, int& size);
 
     Value* codegen_literal_array(std::vector<Value*> values);
 

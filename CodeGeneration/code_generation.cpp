@@ -251,13 +251,7 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
         variable_ptr = builder->CreateAlloca(type, 0, s.c_str());
     }
 
-//    identifiers.insert_or_assign(s, variable_ptr);
-//    identifier_types.insert_or_assign(s, type);
     variable_scope->add(s, variable_ptr, element_type, clazz, size);
-
-
-//    ConstantArray::get
-
 }
 void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
     string s = n->children.front()->val.stringValue;
@@ -308,8 +302,8 @@ void code_generation::codegen_variable_assignment(node *n, IRBuilder<>* b) {
         function->getBasicBlockList().push_back(elseBB);
         builder->SetInsertPoint(elseBB);
 
-
-        codegen_print_string(m, codegen_literal_string("Invalid array index"));
+        int temp = 1;
+        codegen_print_string(m, codegen_literal_string("Invalid array index", temp));
 
 
         builder->CreateBr(mergeBB);
@@ -413,9 +407,10 @@ Value *code_generation::codegen_literal_float(double n) {
 Value *code_generation::codegen_literal_boolean(bool n) {
     return ConstantInt::get(Type::getInt1Ty(context), APInt(1, n ? 1 : 0));
 }
-Value *code_generation::codegen_literal_string(const std::string&  n) {
+Value *code_generation::codegen_literal_string(const std::string& n, int& size) {
 
     auto ss = StringRef(n);
+    size = n.length();
     auto string_val = ConstantDataArray::getString(context, ss, true);
 
     AllocaInst* alloca = builder->CreateAlloca(string_val->getType(), 0, "temp_string_alloca");
@@ -653,8 +648,8 @@ Value *code_generation::codegen_factor(node *n, int& size) {
             function->getBasicBlockList().push_back(elseBB);
             builder->SetInsertPoint(elseBB);
 
-
-            codegen_print_string(m, codegen_literal_string("Invalid array index"));
+            int temp_size = 0;
+            codegen_print_string(m, codegen_literal_string("Invalid array index", temp_size));
 
 
             builder->CreateBr(mergeBB);
@@ -706,11 +701,14 @@ Value *code_generation::codegen_factor(node *n, int& size) {
         size = 1;
     }
     else if (x->type == T_STRING_LITERAL) {
-        return_val = codegen_literal_string(x->val.stringValue);
-        size = 1;
+        return_val = codegen_literal_string(x->val.stringValue, size);
     }
 
-    return is_neg ? builder->CreateNeg(return_val) : return_val;
+    int temp = size;
+    return is_neg ? operation_block(
+            [this](Value* lhs,Value* rhs){return builder->CreateFNeg(lhs,"multmp");},
+            return_val, temp, nullptr, 0)
+            : return_val;
 }
 
 void code_generation::codegen_print_prototype(Module *mod) {
@@ -784,6 +782,91 @@ void code_generation::codegen_scan_prototype() {
         FunctionType *printfType = FunctionType::get(builder->getInt8PtrTy(), args, true);
         Function::Create(printfType, Function::ExternalLinkage, "scanString", m);
     }
+
+    Function* stringCompare = m->getFunction("stringCompare");
+    if (scanString == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getInt8PtrTy(context));
+        args.push_back(Type::getInt8PtrTy(context));
+
+        FunctionType *printfType = FunctionType::get(builder->getInt8PtrTy(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "stringCompare", m);
+    }
+
+//    Function* stringCompareLLVM = m->getFunction("stringCompareLLVM");
+//    if (scanString == nullptr){
+//        std::vector<Type *> args;
+//        args.push_back(Type::getInt8PtrTy(context));
+//        args.push_back(Type::getInt8PtrTy(context));
+//
+//        FunctionType *printfType = FunctionType::get(builder->getInt1Ty(), args, true);
+//        Function* f = Function::Create(printfType, Function::ExternalLinkage, "stringCompareLLVM", m);
+//
+//        BasicBlock *BB = BasicBlock::Create(context, "entry", f);
+//        BasicBlock* currentBlock = builder->GetInsertBlock();
+//
+//        builder->SetInsertPoint(BB);
+//
+//        vector<Value*> v;
+//        for (auto &Arg : f->args()){
+//            v.push_back(&Arg);
+////            variable_scope->add(std::string(Arg.getName()), &Arg, (&Arg)->getType(), variable_inst::VARIABLE_CLASS::VALUE);
+//        }
+//
+//        Function* function = builder->GetInsertBlock()->getParent();
+//        BasicBlock* mainBlock = BasicBlock::Create(context, "startBl");
+//        BasicBlock* retFalse = BasicBlock::Create(context, "retFalse");
+//        BasicBlock* retTrue = BasicBlock::Create(context, "retTrue");
+//        BasicBlock* callAgain = BasicBlock::Create(context, "callAgain");
+//        BasicBlock* secondTier = BasicBlock::Create(context, "secondTier");
+//
+//        /** Main **/
+//        builder->SetInsertPoint(mainBlock);
+//        Value* vv = v.at(0);
+//        Value* lc = builder->CreateLoad(vv);
+//        Value* rc = builder->CreateLoad(v.at(1));
+//
+//        Value* l1 = builder->CreateICmpEQ(lc, ConstantInt::get(builder->getInt8Ty(), APInt(8,0)));
+//        Value* r1 = builder->CreateICmpEQ(rc, ConstantInt::get(builder->getInt8Ty(), APInt(8,0)));
+//
+//        Value* cond = builder->CreateAnd(l1,r1);
+//        builder->CreateCondBr(cond, retTrue, secondTier);
+//
+//        /** Return True **/
+//        mainBlock = builder->GetInsertBlock();
+//        function->getBasicBlockList().push_back(retTrue);
+//        builder->SetInsertPoint(retTrue);
+//
+//        builder->CreateRet(codegen_literal_boolean(true));
+//
+//        /** Second Level **/
+//        retTrue = builder->GetInsertBlock();
+//        function->getBasicBlockList().push_back(secondTier);
+//        builder->SetInsertPoint(secondTier);
+//
+//        cond = builder->CreateNot(builder->CreateOr(l1,r1));
+//        builder->CreateCondBr(cond, retFalse, callAgain);
+//
+//        /** Return False **/
+//        secondTier = builder->GetInsertBlock();
+//        function->getBasicBlockList().push_back(retFalse);
+//        builder->SetInsertPoint(retFalse);
+//
+//        /** Call Again **/
+//        retFalse = builder->GetInsertBlock();
+//        function->getBasicBlockList().push_back(callAgain);
+//        builder->SetInsertPoint(callAgain);
+//
+////        builder->getInt8Ty()->get
+//        Value* newL = builder->CreateAdd(v.at(0), ConstantInt::get(builder->getInt8Ty(), APInt(8,8)));
+//        Value* newR = builder->CreateAdd(v.at(1), ConstantInt::get(builder->getInt8Ty(), APInt(8,8)));
+//        vector<Value*> newArgs = {newL,newR};
+//        builder->CreateRet(builder->CreateCall(f, newArgs));
+//
+//
+//
+//        cond = builder->CreateICmpEQ(builder->CreateLoad(v.at(0)), builder->CreateLoad(v.at(1)));
+//    }
 }
 void code_generation::codegen_scan_string_prototype() {
 
@@ -864,7 +947,22 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
                                         Value* rhs, int rhs_size,
                                         bool is_comparison) {
 
-    if (lhs_size == 1 && rhs_size == 1){
+    if (lhs_size == 1 && rhs_size == 0){
+        Type* lhs_type = nullptr;
+
+        if (lhs->getType() != Type::getDoubleTy(context)){
+            lhs_type = lhs->getType();
+            lhs = builder->CreateSIToFP(lhs, Type::getDoubleTy(context));
+        }
+
+        Value *v = floating_op(lhs,nullptr);
+
+        if (lhs_type != nullptr && !is_comparison)
+            v = builder->CreateFPToSI(v, lhs_type);
+
+        return v;
+    }
+    else if (lhs_size == 1 && rhs_size == 1){
         Type* lhs_type = nullptr;
         Type* rhs_type = nullptr;
 
@@ -883,7 +981,8 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
             v = builder->CreateFPToSI(v, rhs_type);
 
         return v;
-    } else if (lhs_size == 1 || rhs_size == 1) {
+    }
+    else if ((lhs_size == 1 || rhs_size == 1) && !is_comparison) {
         Value* temp_lhs = nullptr;
         Value* temp_rhs = nullptr;
 
@@ -914,30 +1013,46 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
         }
 
         return temp_lhs;
-    } else if (lhs_size == rhs_size){
-//        Value* temp_lhs = lhs;
-        Value* temp_rhs = rhs;
-//        temp_rhs = lhs;
-        Value* load = builder->CreateLoad(lhs);
-        Value* temp_lhs = builder->CreateAlloca(load->getType(), nullptr, "temp_lhs");
+    }
+    else if (lhs_size == rhs_size && !is_comparison){
+
+
+        Value *temp_rhs = rhs;
+        Value *load = builder->CreateLoad(lhs);
+        Value *temp_lhs = builder->CreateAlloca(load->getType(), nullptr, "temp_lhs");
         builder->CreateStore(load, temp_lhs);
 
-        for (int i = 0; i < lhs_size; i++){
-            Value* temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
+        for (int i = 0; i < lhs_size; i++) {
+            Value *temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
 
             llvm::Value *i32zero = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, 0));
             llvm::Value *indices[2] = {i32zero, temp_index};
 
-            llvm::Value* varInst_l = builder->CreateInBoundsGEP(temp_lhs, llvm::ArrayRef<llvm::Value *>(indices, 2));
-            llvm::Value* varInst_r = builder->CreateInBoundsGEP(temp_rhs, llvm::ArrayRef<llvm::Value *>(indices, 2));
+            llvm::Value *varInst_l = builder->CreateInBoundsGEP(temp_lhs,
+                                                                llvm::ArrayRef<llvm::Value *>(indices, 2));
+            llvm::Value *varInst_r = builder->CreateInBoundsGEP(temp_rhs,
+                                                                llvm::ArrayRef<llvm::Value *>(indices, 2));
 
             int temp = 1;
-            Value* op = operation_block(floating_op, builder->CreateLoad(varInst_l), temp, builder->CreateLoad(varInst_r), 1);
+            Value *op = operation_block(floating_op, builder->CreateLoad(varInst_l), temp,
+                                        builder->CreateLoad(varInst_r), 1);
             builder->CreateStore(op, varInst_l);
         }
 
         return temp_lhs;
+
     }
+    else if (is_comparison){
+        std::vector<Value *> printArgs;
+
+        printArgs.push_back(lhs);
+        printArgs.push_back(rhs);
+        return builder->CreateCall(m->getFunction("stringCompare"), {lhs, rhs});
+//        vector<Value*> newArgs = {lhs,rhs};
+//        return builder->CreateRet(builder->CreateCall(m->getFunction("stringCompareLLVM"), newArgs));
+//        return codegen_literal_boolean(false);
+    }
+
     return nullptr;
 
 }
@@ -986,75 +1101,4 @@ Value *code_generation::generateValue(Module *m) {
 //    return llvm::ConstantExpr::getBitCast(chars, charType->getPointerTo());
     return ConstantArray::get(arrayType, chars);
 }
-
-
-
-
-
-
-
-
-
-
-
-//void code_generation::write_to_file(Module* m) {
-//////    InitializeModuleAndPassManager();
-//    // Initialize the target registry etc.
-////    InitializeAllTargetInfos();
-////    InitializeAllTargets();
-////    InitializeAllTargetMCs();
-////    InitializeAllAsmParsers();
-////    InitializeAllAsmPrinters();
-//
-//    auto TargetTriple = sys::getDefaultTargetTriple();
-////    m->setTargetTriple(TargetTriple);
-//
-////    std::string Error;
-////    auto Target = TargetRegistry::lookupTarget(TargetTriple, Error);
-//
-//    // Print an error and exit if we couldn't find the requested target.
-//    // This generally occurs if we've forgotten to initialise the
-//    // TargetRegistry or we have a bogus target triple.
-////    if (!Target) {
-////        errs() << Error;
-////        return;
-////    }
-//
-//    auto CPU = "generic";
-//    auto Features = "";
-//
-////    TargetOptions opt;
-//    auto RM = Optional<Reloc::Model>();
-////    auto TheTargetMachine =Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-//
-////    m->setDataLayout(TheTargetMachine->createDataLayout());
-//
-//    auto Filename = "output.o";
-//    std::error_code EC;
-//    raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
-//
-//    if (EC) {
-//        errs() << "Could not open file: " << EC.message();
-//        return;
-//    }
-//
-//    legacy::PassManager pass;
-//    auto FileType = CGFT_ObjectFile;
-//
-////    if (TheTargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
-////        errs() << "TargetMachine can't emit a file of this type";
-////        return;
-////    }
-//
-//    pass.run(*m);
-//    dest.flush();
-//}
-
-
-
-
-
-
-
-
 
