@@ -9,10 +9,8 @@ variable blank: integer[2];
 procedure Fib : integer(variable val :integer)
 	procedure Sub : integer(variable val1 : integer)
 		begin
-		    blank[0] := 0;
 			return val1 - 1;
 		end procedure;
-
 	begin
 
 	if(val == 0) then
@@ -21,12 +19,13 @@ procedure Fib : integer(variable val :integer)
 	if(val == 1) then
 		return 1;
 	end if;
-	return val + Fib(Sub(val));
+	//return val + Fib(Sub(val));
+	return val;
 end procedure;
 
 
 begin
-
+max := Fib(3);
 max := getInteger();
 for(i := 0; i < max)
 	x := Fib(i);

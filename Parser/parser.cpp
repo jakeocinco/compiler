@@ -110,11 +110,19 @@ node* parser::parse_procedure() {
     const unsigned type_val = current.type;
     n->newChild(parse_type_mark());
 
-    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
-    push_current_symbol_table();
-    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
+    vector<int> param_types;
+    n->newChild(parse_procedure_parameter_list(param_types));
 
-    n->newChild(parse_procedure_parameter_list());
+    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
+    current_table->add_symbol_params(proc_name, param_types);
+
+    push_current_symbol_table();
+
+    push_new_identifier_to_symbol_table(proc_name, type_to_literal(type_val));
+    current_table->add_symbol_params(proc_name, param_types);
+
+
+
 
     n->newChild(parse_procedure_declaration_block());
 
@@ -137,7 +145,7 @@ node* parser::parse_procedure_declaration_block() {
         std::list<std::function<bool()>> functionList;
 
         functionList.emplace_back([this, n] { return process_block_comments(n); });
-        functionList.emplace_back([this, n] { return process_variable_declaration(n); });
+        functionList.emplace_back([this, n] { return process_variable_declaration(n, false); });
         functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
 //        functionList.emplace_back([this, n] { return process_type_declaration(n); });
 
@@ -163,11 +171,10 @@ node* parser::parse_procedure_statement_block(){
 
     return n;
 }
-node* parser::parse_procedure_parameter_list(){
+node* parser::parse_procedure_parameter_list(vector<int>& param_types){
 
     bool isFirstRun = true;
     node* n = new node(T_PARAMETER_LIST);
-
 
     expecting_reserved_word(T_LPAREN, "(");
     while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
@@ -176,7 +183,25 @@ node* parser::parse_procedure_parameter_list(){
         } else {
             expecting_reserved_word(T_COMMA, ",");
         }
-        n->newChild(parse_variable_declaration(false));
+        node* x = new node(T_VARIABLE_DECLARATION);
+        n->newChild(x);
+
+        x->newChild(expecting_reserved_word(T_VARIABLE, "variable"));
+        const string identifier_name = current.val.stringValue;
+        x->newChild(expecting_identifier());
+        x->newChild(expecting_reserved_word(T_COLON, ":"));
+        const unsigned type_val = current.type;
+        x->newChild(parse_type_mark());
+
+
+        push_new_identifier_to_symbol_table(identifier_name, type_to_literal(type_val));
+        param_types.push_back(type_to_literal(type_val));
+        if (current.type == T_LBRACKET){
+            x->newChild(expecting_reserved_word(T_LBRACKET, "["));
+            unsigned variable_val = 0; // TODO Check if int
+            x->newChild(parse_expression(variable_val));
+            x->newChild(expecting_reserved_word(T_RBRACKET, "]"));
+        }
     }
 
     expecting_reserved_word(T_RPAREN, ")");
@@ -198,7 +223,8 @@ node* parser::parse_procedure_call() {
     bool isFirstRun = true;
     node* n = new node(T_PROCEDURE_CALL);
 
-    verify_identifier_is_declared(current.val.stringValue);
+    string proc_name = current.val.stringValue;
+    verify_identifier_is_declared(proc_name);
     if (current.type == T_IDENTIFIER || (current.type >= T_GET_BOOL && current.type <= T_PUT_STRING)){
         n->newChild(new node(current.val.stringValue, current.type));
         consume_token();
@@ -206,7 +232,9 @@ node* parser::parse_procedure_call() {
         throw_runtime_template("Was expecting procedure.");
     }
 
+    vector<int> param_types = current_table->get_symbol_params(proc_name);
     expecting_reserved_word(T_LPAREN, "(");
+    int index = 0;
     while (current.type != T_RPAREN && current.type != T_END_OF_FILE) {
         if (isFirstRun){
             isFirstRun = false;
@@ -215,6 +243,13 @@ node* parser::parse_procedure_call() {
         }
         unsigned variable_val = 0;
         n->newChild(parse_expression(variable_val));
+
+        unsigned code = 0;
+        if (index >= param_types.size() || !are_types_valid_to_combine(code, param_types.at(index), variable_val, false)){
+            cout << "Type - " << param_types.at(index) << ", " << variable_val << endl;
+            throw_runtime_template("Invalid types.");
+        }
+        index++;
     }
 
     expecting_reserved_word(T_RPAREN, ")");
@@ -495,7 +530,6 @@ node* parser::parse_variable_assignment() {
     unsigned variable_val = 0;
     n->newChild(parse_expression(variable_val));
     if (current_table->get_symbol_value(name) != variable_val){
-        cout << name << ": " << current_table->get_symbol_value(name) << " " << variable_val << endl;
         if (!(current_table->get_symbol_value(name) == T_FLOAT_LITERAL && variable_val == T_INTEGER_LITERAL) &&
                 !(current_table->get_symbol_value(name) == T_TRUE && variable_val == T_FALSE) &&
                 !(current_table->get_symbol_value(name) == T_INTEGER_LITERAL && (variable_val == T_FALSE || variable_val == T_TRUE))){
@@ -556,14 +590,26 @@ bool parser::are_types_valid_to_combine(unsigned& code, unsigned c1, unsigned c2
     if (c1 == c2){
         code = c1;
         return true;
-    } else if ((c1 == T_INTEGER_LITERAL && c2 == T_TRUE) ||
+    }
+    else if ((c1 == T_FALSE && c2 == T_TRUE) || (c1 == T_TRUE && c2 == T_FALSE)){
+        code = T_TRUE;
+        return true;
+    }
+    else if ((c1 == T_INTEGER_LITERAL && c2 == T_TRUE) ||
             (c1 == T_INTEGER_LITERAL && c2 == T_FALSE)){
         code = T_INTEGER_LITERAL;
         return true;
-    } else if(c1 == T_INTEGER_LITERAL && c2 == T_FLOAT_LITERAL){
+    }
+    else if ((c1 == T_TRUE && c2 == T_INTEGER_LITERAL) ||
+             (c1 == T_FALSE && c2 == T_INTEGER_LITERAL)){
+        code = T_TRUE;
+        return true;
+    }
+    else if(c1 == T_FLOAT_LITERAL && c2 == T_INTEGER_LITERAL){
         code = T_FLOAT_LITERAL;
         return true;
-    } else if (first_run){
+    }
+    else if (first_run){
         return are_types_valid_to_combine(code, c2, c1, false);
     }
     return false;
@@ -716,14 +762,23 @@ void parser::throw_unexpected_reserved_word(const string& received_token, const 
 void parser::initialize_symbol_table() {
     current_table = new symbol_table();
     push_new_identifier_to_symbol_table("getbool", T_TRUE);
+    current_table->add_symbol_params("getbool", {});
     push_new_identifier_to_symbol_table("getinteger", T_INTEGER_LITERAL);
+    current_table->add_symbol_params("getinteger", {});
     push_new_identifier_to_symbol_table("getfloat", T_FLOAT_LITERAL);
+    current_table->add_symbol_params("getfloat", {});
     push_new_identifier_to_symbol_table("getstring", T_STRING_LITERAL);
+    current_table->add_symbol_params("getstring", {});
     push_new_identifier_to_symbol_table("putbool", T_TRUE);
+    current_table->add_symbol_params("putbool", {T_TRUE});
     push_new_identifier_to_symbol_table("putinteger", T_TRUE);
+    current_table->add_symbol_params("putinteger", {T_INTEGER_LITERAL});
     push_new_identifier_to_symbol_table("putfloat", T_TRUE);
+    current_table->add_symbol_params("putfloat", {T_FLOAT_LITERAL});
     push_new_identifier_to_symbol_table("putstring", T_TRUE);
+    current_table->add_symbol_params("putstring", {T_STRING_LITERAL});
     push_new_identifier_to_symbol_table("sqrt", T_FLOAT_LITERAL);
+    current_table->add_symbol_params("sqrt", {T_FLOAT_LITERAL});
 }
 void parser::push_new_identifier_to_symbol_table(string identifier, int n) {
     current_table->add_symbol(identifier, n);
@@ -737,6 +792,7 @@ unsigned parser::verify_identifier_is_declared(string identifier) {
 }
 void parser::push_current_symbol_table() {
     current_table = new symbol_table(current_table);
+
 }
 void parser::pop_current_symbol_table() {
     current_table = current_table->getParent();

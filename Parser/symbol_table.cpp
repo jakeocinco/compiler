@@ -53,4 +53,16 @@ void symbol_table::print(bool current) {
     }
 }
 
+vector<int> symbol_table::get_symbol_params(std::string identifier) {
+    if (this->params_types.contains(identifier))
+        return this->params_types.find(identifier)->second;
+    if (this->parent != nullptr)
+        return this->parent->get_symbol_params(identifier);
+    return vector<int>();
+}
+
+void symbol_table::add_symbol_params(std::string identifier, vector<int> param_types) {
+    this->params_types.insert_or_assign(identifier, param_types);
+}
+
 

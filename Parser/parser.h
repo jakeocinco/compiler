@@ -34,7 +34,7 @@ private:
     node* parse_procedure();
     node* parse_procedure_declaration_block();
     node* parse_procedure_statement_block();
-    node* parse_procedure_parameter_list();
+    node* parse_procedure_parameter_list(vector<int>& param_types);
     node* parse_procedure_return_statement();
     node* parse_procedure_call();
 

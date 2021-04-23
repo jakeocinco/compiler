@@ -5,6 +5,12 @@ program LoopFib is
     variable arr : integer[5];
     variable str : string;
     variable str2 : string;
+    procedure Fib : integer(variable val :integer)
+        variable i : integer;
+    begin
+        i := 1;
+        return val + i;
+    end procedure;
 begin
     // integer types
     i1 := 3;
@@ -16,14 +22,17 @@ begin
     // string
     str := "false__";
     str2 := str;
+    temp := putFloat(3.4);
     temp := putFloat(sqrt(loopVal2));
     temp := putString(str2);
-    temp := putInteger(2 & 2);
+    temp := putInteger(false);
+    temp := putBool(false);
+    temp := putBool(3);
     temp := false;
     temp := 4 > 3;
     arr := 6;
     arr[1] := arr[1] * 4;
     temp := putInteger(arr[0]);
-    temp := putInteger(arr[1]);
+    temp := putInteger(Fib(arr[1]));
 
 end program.
