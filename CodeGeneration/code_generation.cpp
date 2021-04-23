@@ -239,7 +239,7 @@ void code_generation::codegen_variable_declaration(node *n, IRBuilder<> *b) {
     }
 
     Value* variable_ptr;
-    if (is_global) {
+    if (is_global && false) {
 
         variable_ptr = new GlobalVariable(*m,
                                  type,
@@ -583,9 +583,6 @@ Value *code_generation::codegen_term(node *n, int& size, Value* lhs) {
     }
     n->children.pop_front();
 
-    std::function<Value*(Value* lhs, Value* rhs)> standard_op = [this](Value* lhs, Value* rhs){return builder->CreateMul(lhs, rhs);};
-    std::function<Value*(Value* lhs, Value* rhs)> floating_op = [this](Value* lhs, Value* rhs){return builder->CreateFMul(lhs, rhs);};
-
     switch (operation) {
         case T_MULTIPLY:
             return codegen_term(n, size, operation_block(
@@ -887,14 +884,21 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
 
         return v;
     } else if (lhs_size == 1 || rhs_size == 1) {
-        Value* temp_lhs = lhs;
-        Value* temp_rhs = rhs;
+        Value* temp_lhs = nullptr;
+        Value* temp_rhs = nullptr;
 
         if (lhs_size == 1){
             temp_rhs = lhs;
-            temp_lhs = rhs;
+            Value* load = builder->CreateLoad(rhs);
+            temp_lhs = builder->CreateAlloca(load->getType(), nullptr, "temp_lhs");
+            builder->CreateStore(load, temp_lhs);
             lhs_size = rhs_size;
             rhs_size = 1;
+        } else {
+            temp_rhs = rhs;
+            Value* load = builder->CreateLoad(lhs);
+            temp_lhs = builder->CreateAlloca(load->getType(), nullptr, "temp_lhs");
+            builder->CreateStore(load, temp_lhs);
         }
 
         for (int i = 0; i < lhs_size; i++){
@@ -911,8 +915,12 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
 
         return temp_lhs;
     } else if (lhs_size == rhs_size){
-        Value* temp_lhs = lhs;
+//        Value* temp_lhs = lhs;
         Value* temp_rhs = rhs;
+//        temp_rhs = lhs;
+        Value* load = builder->CreateLoad(lhs);
+        Value* temp_lhs = builder->CreateAlloca(load->getType(), nullptr, "temp_lhs");
+        builder->CreateStore(load, temp_lhs);
 
         for (int i = 0; i < lhs_size; i++){
             Value* temp_index = llvm::ConstantInt::get(m->getContext(), llvm::APInt(8, i));
