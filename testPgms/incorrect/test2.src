@@ -8,7 +8,7 @@
 program test_program is
 
     // your lexer should throw an error on the illegal character
-    variable fibb_re#sult : integer;
+    variable fibb#_result : integer;
     variable out : bool;
 
     procedure fibb : integer(variable n : integer)

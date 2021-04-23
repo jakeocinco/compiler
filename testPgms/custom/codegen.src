@@ -1,7 +1,29 @@
 program LoopFib is
     variable loopVal2 : float;
     variable temp : bool;
+    variable i1 : integer;
+    variable arr : integer[5];
+    variable str : string;
+    variable str2 : string;
 begin
-    loopVal2 := getFloat();
+    // integer types
+    i1 := 3;
+    // i1 := 3.3; // should fail
+    // i1 := "3.3"; // should fail
+    i1 := true;
+    // float type
+    loopVal2 := 16;
+    // string
+    str := "false__";
+    str2 := str;
     temp := putFloat(sqrt(loopVal2));
+    temp := putString(str2);
+    temp := putInteger(2 & 2);
+    temp := false;
+    temp := 4 > 3;
+    arr := 6;
+    arr[1] := arr[1] * 4;
+    temp := putInteger(arr[0]);
+    temp := putInteger(arr[1]);
+
 end program.

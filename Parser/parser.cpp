@@ -361,7 +361,7 @@ node* parser::parse_relation(unsigned& code, node *n) {
         if (!are_types_valid_to_combine(code, c1, c2)){
             throw_runtime_template("Invalid types: " + std::to_string(c1) + " and " + std::to_string(c2) + ".");
         } else {
-            code = T_RELATION;
+            code = T_TRUE;
         }
     } else {
         code = c1;
@@ -480,7 +480,8 @@ node* parser::parse_variable_declaration(bool is_global) {
 node* parser::parse_variable_assignment() {
     node* n = new node(T_VARIABLE_ASSIGNMENT);
 
-    verify_identifier_is_declared(current.val.stringValue);
+    string name = current.val.stringValue;
+    verify_identifier_is_declared(name);
     n->newChild(expecting_identifier());
 
     if (T_LBRACKET == current.type){
@@ -493,6 +494,14 @@ node* parser::parse_variable_assignment() {
     n->newChild(expecting_reserved_word(T_COLON_EQUALS, ":="));
     unsigned variable_val = 0;
     n->newChild(parse_expression(variable_val));
+    if (current_table->get_symbol_value(name) != variable_val){
+        cout << name << ": " << current_table->get_symbol_value(name) << " " << variable_val << endl;
+        if (!(current_table->get_symbol_value(name) == T_FLOAT_LITERAL && variable_val == T_INTEGER_LITERAL) &&
+                !(current_table->get_symbol_value(name) == T_TRUE && variable_val == T_FALSE) &&
+                !(current_table->get_symbol_value(name) == T_INTEGER_LITERAL && (variable_val == T_FALSE || variable_val == T_TRUE))){
+            throw_runtime_template("Received non matching types.");
+        }
+    }
 
     return n;
 }
@@ -706,14 +715,14 @@ void parser::throw_unexpected_reserved_word(const string& received_token, const 
 /** Symbol Table **/
 void parser::initialize_symbol_table() {
     current_table = new symbol_table();
-    push_new_identifier_to_symbol_table("getbool", T_GET_BOOL);
-    push_new_identifier_to_symbol_table("getinteger", T_GET_INTEGER);
-    push_new_identifier_to_symbol_table("getfloat", T_GET_FLOAT);
-    push_new_identifier_to_symbol_table("getstring", T_GET_STRING);
-    push_new_identifier_to_symbol_table("putbool", T_PUT_BOOL);
-    push_new_identifier_to_symbol_table("putinteger", T_PUT_INTEGER);
-    push_new_identifier_to_symbol_table("putfloat", T_PUT_FLOAT);
-    push_new_identifier_to_symbol_table("putstring", T_PUT_STRING);
+    push_new_identifier_to_symbol_table("getbool", T_TRUE);
+    push_new_identifier_to_symbol_table("getinteger", T_INTEGER_LITERAL);
+    push_new_identifier_to_symbol_table("getfloat", T_FLOAT_LITERAL);
+    push_new_identifier_to_symbol_table("getstring", T_STRING_LITERAL);
+    push_new_identifier_to_symbol_table("putbool", T_TRUE);
+    push_new_identifier_to_symbol_table("putinteger", T_TRUE);
+    push_new_identifier_to_symbol_table("putfloat", T_TRUE);
+    push_new_identifier_to_symbol_table("putstring", T_TRUE);
     push_new_identifier_to_symbol_table("sqrt", T_FLOAT_LITERAL);
 }
 void parser::push_new_identifier_to_symbol_table(string identifier, int n) {
