@@ -3,6 +3,7 @@
 //
 
 #include <string>
+#include <cstring>
 #include "node.h"
 #include "../tokenCodes.h"
 

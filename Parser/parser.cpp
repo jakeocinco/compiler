@@ -2,6 +2,8 @@
 // Created by Jacob Carlson on 2/10/21.
 //
 
+#include <functional>
+#include <string>
 #include "parser.h"
 #include "../tokenCodes.h"
 

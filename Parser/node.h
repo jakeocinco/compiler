@@ -8,6 +8,7 @@
 
 #include <list>
 #include <deque>
+#include <string>
 
 class node {
 public:

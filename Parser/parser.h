@@ -9,6 +9,8 @@
 #include "symbol_table.h"
 #include "../Scanner/scanner.h"
 #include <string>
+#include <functional>
+#include <cstring>
 
 class parser {
 public:

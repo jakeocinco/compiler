@@ -3,6 +3,8 @@
 //
 
 #include <iostream>
+#include <map>
+#include <vector>
 #include "symbol_table.h"
 
 symbol_table::symbol_table(symbol_table *parent) {
