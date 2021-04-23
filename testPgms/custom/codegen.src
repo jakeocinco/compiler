@@ -5,7 +5,9 @@ program LoopFib is
     variable loopVal : integer;
     variable loopVal2 : float;
     variable tempbool : bool;
+    variable str : string;
 begin
+    str := "--- WORDS";
     arr1 := getFloat();
     arr2 := 3.333 * arr1;
     arr3 := (arr1 - arr2)  / 2;
@@ -13,12 +15,12 @@ begin
         tempbool := putFloat(arr1[loopVal]);
         loopVal := loopVal + 1;
     end for;
-    tempbool := putString("__________");
+    tempbool := putString("====");
     for (loopVal := 0; loopVal < 3)
             tempbool := putFloat(arr2[loopVal]);
             loopVal := loopVal + 1;
     end for;
-    tempbool := putString("__________");
+    tempbool := putString(str);
      for (loopVal := 0; loopVal < 3)
                  tempbool := putFloat(arr3[loopVal]);
                  loopVal := loopVal + 1;

@@ -155,7 +155,10 @@ string scanner::get_next_text() {
             bool doNotReturn = false;
 
             // Special cases for symbols, split out to separate functions
-            if (symbol == "/"){
+            if (s.length() > 0 && s.at(0) == '\"' && ( s.length() == 1 || s.at(s.length() - 1) != '\"')){
+                doNotReturn = true;
+            }
+            else if (symbol == "/"){
                 if (raw_text.at(cursor + 1) == '/' || raw_text.at(cursor + 1) == '*'){
                     s = trim(raw_text.substr(0,cursor+2), ws);
                     raw_text = raw_text.substr(cursor+2, raw_text.length());
@@ -163,7 +166,7 @@ string scanner::get_next_text() {
                     return s;
                 }
             }
-            if (symbol == "*"){
+            else if (symbol == "*"){
                 if (raw_text.at(cursor + 1) == '/'){
                     if (cursor == 0){
                         s = trim(raw_text.substr(0,cursor+2), ws);
@@ -178,7 +181,7 @@ string scanner::get_next_text() {
                     }
                 }
             }
-            if (symbol == ":"){
+            else if (symbol == ":"){
                 if (raw_text.at(cursor + 1) == '='){
                     if (cursor == 0){
                         s = trim(raw_text.substr(0,cursor+2), ws);
@@ -193,7 +196,7 @@ string scanner::get_next_text() {
                     }
                 }
             }
-            if (symbol == ">" || symbol == "<" || symbol == "!" || symbol == "="){
+            else if (symbol == ">" || symbol == "<" || symbol == "!" || symbol == "="){
                 if (raw_text.at(cursor + 1) == '='){
                     if (cursor == 0){
                         s = trim(raw_text.substr(0,cursor+2), ws);
@@ -208,14 +211,12 @@ string scanner::get_next_text() {
                     }
                 }
             }
-            if (symbol == "."){
+            else if (symbol == "."){
                 if (0 < s.length() && isdigit(s[s.length() - 1])){
                     doNotReturn = true;
                 }
             }
-            if (s.length() > 0 && s.at(0) == '\"' && s.at(s.length() - 1) != '\"'){
-                doNotReturn = true;
-            }
+
 
             // THIS CAN BE BETTER - check only symbol probably
             if (0 < s.length() && !doNotReturn){
