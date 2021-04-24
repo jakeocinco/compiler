@@ -20,12 +20,7 @@ code_generation::code_generation(std::string file_text) {
     else
         std::cout << "Not program root" << endl;
 
-    if (true){
-        llvm::raw_ostream& output = llvm::outs();
-        this->m->print(output, nullptr);
-    }
-
-    print_module_ll(true);
+    print_module_ll(false);
     write_module_to_file("output.o");
 
 }

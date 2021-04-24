@@ -23,7 +23,8 @@ parser::parser(string file_text) {
 
     head = parse_program();
 
-    print_node_to_json(head);
+    if (false)
+        print_node_to_json(head);
 }
 node* parser::get_head() {
     return head;
@@ -46,8 +47,6 @@ node* parser::parse_program() {
     n->newChild(parse_program_declaration_block());
 
     n->newChild(expecting_reserved_word(T_BEGIN, "begin"));
-    std::cout << "\nPROGRAM LEVEL" << endl;
-    this->current_table->print(true);
     n->newChild(parse_program_statement_block());
 
     n->newChild(expecting_reserved_word(T_END, "end"));

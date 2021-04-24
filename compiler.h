@@ -14,8 +14,10 @@ public:
     explicit compiler(const string& file_name);
 private:
 
-
     static string get_file_text_as_string(const string& file_name);
+    static string get_file_name_root(const string& file_name);
+
+    static void link_to_runtime(const string& file_name);
 };
 
 
