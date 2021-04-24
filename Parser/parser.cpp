@@ -70,7 +70,7 @@ node* parser::parse_program_declaration_block() {
 
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_declaration(n, true); });
-        functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
+        functionList.emplace_back([this, n] { return process_procedure_declaration(n, true); });
 
         run_processes_until_true(n, functionList);
     }
@@ -100,12 +100,14 @@ node* parser::parse_program_statement_block(){
 }
 
 /** Procedures **/
-node* parser::parse_procedure() {
+node* parser::parse_procedure(bool is_global) {
 
     node* n = new node(T_PROCEDURE_DECLARATION);
 
     if (current.type == T_GLOBAL)
         n->newChild(expecting_reserved_word(T_GLOBAL, "global"));
+    else if (is_global)
+        n->newChild(node::create_identifier_literal_node("global", T_GLOBAL));
 
     n->newChild(expecting_reserved_word(T_PROCEDURE, "procedure"));
 
@@ -154,7 +156,7 @@ node* parser::parse_procedure_declaration_block() {
 
         functionList.emplace_back([this, n] { return process_block_comments(n); });
         functionList.emplace_back([this, n] { return process_variable_declaration(n, false); });
-        functionList.emplace_back([this, n] { return process_procedure_declaration(n); });
+        functionList.emplace_back([this, n] { return process_procedure_declaration(n, false); });
 //        functionList.emplace_back([this, n] { return process_type_declaration(n); });
 
         run_processes_until_true(n, functionList);
@@ -724,9 +726,9 @@ bool parser::process_variable_assignment(node* n) {
     }
     return false;
 }
-bool parser::process_procedure_declaration(node* n) {
+bool parser::process_procedure_declaration(node* n, bool is_global) {
     if (current.type == T_PROCEDURE || (current.type == T_GLOBAL && next.type == T_PROCEDURE)){
-        n->newChild(parse_procedure());
+        n->newChild(parse_procedure(is_global));
         return true;
     }
     return false;

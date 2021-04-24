@@ -12,7 +12,13 @@ symbol_table::symbol_table(symbol_table *parent) {
 }
 
 void symbol_table::add_symbol(std::string identifier, int n) {
-    this->table.insert_or_assign(identifier, n);
+    if (!this->table.contains(identifier)) {
+        this->table.insert_or_assign(identifier, n);
+    } else {
+        bool is_global = false;
+        throw std::runtime_error("Variable " + identifier + " already declared in " + (is_global ? "global" : "local") + " scope.");
+    }
+
 }
 bool symbol_table::check_symbol_status(const std::string& identifier) {
     if (this->table.contains(identifier))

@@ -24,7 +24,8 @@ code_generation::code_generation(std::string file_text) {
         print_module_ll(false);
         write_module_to_file("output.o");
     } else {
-        throw runtime_error("Could not codegen");
+
+        throw runtime_error("");
     }
 }
 
@@ -172,6 +173,11 @@ void code_generation::codegen_return_statement(node *n) {
     builder->CreateRet(codegen_expression(get_reserve_node(n,T_EXPRESSION), cond_size));
 }
 void code_generation::codegen_function_prototype(node *n) {
+    bool is_global = false;
+    if (n->children.front()->type == T_GLOBAL) {
+        is_global = true;
+        get_reserve_node(n,T_GLOBAL);
+    }
 
     get_reserve_node(n,T_PROCEDURE);
     std::string name = get_reserve_node(n,T_IDENTIFIER)->val.stringValue;
@@ -190,9 +196,10 @@ void code_generation::codegen_function_prototype(node *n) {
     // Have to add the function to scope as Value*
     Value* f_temp = Function::Create(f_type, Function::ExternalLinkage, name, m);
 
-    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION, false);
+    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION, is_global);
     variable_scope = new scope(variable_scope);
-    variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION, false);
+    if (!is_global)
+        variable_scope->add(name, f_temp, f_temp->getType(), variable_inst::VARIABLE_CLASS::FUNCTION, is_global);
 
     // Have to cast function back to Function*
     auto* f = cast<Function>(f_temp);
@@ -346,7 +353,7 @@ Value *code_generation::codegen_literal_boolean(bool n) {
 Value *code_generation::codegen_literal_string(const std::string& n, int& size) {
 
     auto ss = StringRef(n);
-    size = n.length();
+    size = n.length() + 1;
     auto string_val = ConstantDataArray::getString(context, ss, true);
 
     AllocaInst* alloca = builder->CreateAlloca(string_val->getType(), 0, "temp_string_alloca");
@@ -473,7 +480,7 @@ Value *code_generation::codegen_relation(node *n, int& size, Value* lhs) {
         case T_N_EQUALS:
             return codegen_term(n,size, operation_block(
                     [this](Value* lhs, Value* rhs){return builder->CreateFCmpONE(lhs, rhs,"nequals");},
-                    lhs, size, rhs, rhs_size, true));
+                    lhs, size, rhs, rhs_size, true, true));
         default:
             cout << "Error" << endl;
     }
@@ -678,6 +685,25 @@ void code_generation::codegen_run_time_prototypes() {
         Function::Create(printfType, Function::ExternalLinkage, "stringCompare", m);
     }
 
+    Function* stringCompareNot = m->getFunction("stringCompareNot");
+    if (stringCompareNot == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getInt8PtrTy(context));
+        args.push_back(Type::getInt8PtrTy(context));
+
+        FunctionType *printfType = FunctionType::get(builder->getInt8PtrTy(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "stringCompareNot", m);
+    }
+
+    Function* castIntToBool = m->getFunction("castIntToBool");
+    if (castIntToBool == nullptr){
+        std::vector<Type *> args;
+        args.push_back(Type::getInt32Ty(context));
+
+        FunctionType *printfType = FunctionType::get(builder->getInt1Ty(), args, true);
+        Function::Create(printfType, Function::ExternalLinkage, "castIntToBool", m);
+    }
+
     Function* sqrt = m->getFunction("sqrt");
     if (sqrt == nullptr){
         std::vector<Type *> args;
@@ -746,7 +772,7 @@ Value *code_generation::codegen_scan_bool() {
         Value *formatStr = builder->CreateGlobalStringPtr("%u", ".integer_sc");
         namedValues.insert_or_assign(".integer_sc", formatStr);
     }
-    return codegen_scan_base(Type::getInt1Ty(context),namedValues.at(".integer_sc"));
+    return builder->CreateCall(m->getFunction("castIntToBool"), {codegen_scan_base(Type::getInt1Ty(context),namedValues.at(".integer_sc"))});
 }
 Value* code_generation::codegen_print_string(Value *v) {
     if (!namedValues.contains(".str")){
@@ -770,7 +796,7 @@ Value *code_generation::codegen_sqrt(Value* v){
 Value *code_generation::operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                                         Value* lhs, int &lhs_size,
                                         Value* rhs, int rhs_size,
-                                        bool is_comparison) {
+                                        bool is_comparison, bool neg) {
 
     if (lhs_size == 1 && rhs_size == 0){
         Type* lhs_type = nullptr;
@@ -868,14 +894,12 @@ Value *code_generation::operation_block(const std::function<Value*(Value* lhs, V
 
     }
     else if (is_comparison){
-        std::vector<Value *> printArgs;
+        std::vector<Value *> comp_args;
 
-        printArgs.push_back(lhs);
-        printArgs.push_back(rhs);
-        return builder->CreateCall(m->getFunction("stringCompare"), {lhs, rhs});
-//        vector<Value*> newArgs = {lhs,rhs};
-//        return builder->CreateRet(builder->CreateCall(m->getFunction("stringCompareLLVM"), newArgs));
-//        return codegen_literal_boolean(false);
+        comp_args.push_back(lhs);
+        comp_args.push_back(rhs);
+
+        return neg ? builder->CreateCall(m->getFunction("stringCompareNot"), comp_args) : builder->CreateCall(m->getFunction("stringCompare"), comp_args);
     }
 
     return nullptr;

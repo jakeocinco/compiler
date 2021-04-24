@@ -6,10 +6,10 @@ program LoopFib is
     variable str : string;
     variable str2 : string;
     procedure Fib : integer(variable val :integer)
-        variable i : integer;
+        global variable i1 : integer;
     begin
-        i := 1;
-        return val + i;
+        i1 := 1;
+        return val + i1;
     end procedure;
 begin
     // integer types
@@ -30,7 +30,7 @@ begin
     temp := putBool(3);
     temp := false;
     temp := 4 > 3;
-    arr := 6
+    arr := 6;
     arr[1] := arr[1] * 4;
     temp := putInteger(arr[0]);
     temp := putInteger(Fib(arr[1]));

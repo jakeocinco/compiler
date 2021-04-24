@@ -142,7 +142,7 @@ private:
     Value* operation_block(const std::function<Value*(Value* lhs, Value* rhs)>& floating_op,
                            Value* lhs, int &lhs_size,
                            Value* rhs,  int rhs_size,
-                           bool is_comparison = false);
+                           bool is_comparison = false, bool neg = false);
     Type* get_type(node *n);
     node* get_reserve_node(node* n, int type);
 

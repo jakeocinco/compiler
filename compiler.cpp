@@ -22,6 +22,9 @@ compiler::compiler(const string& file_name) {
 
         link_to_runtime(get_file_name_root(file_name));
     } catch (runtime_error& re){
+
+        if (*(re.what()) != 0)
+            cout << re.what() << endl;
         cout << "\nProgram was not compiled due to error" << endl;
     }
 }

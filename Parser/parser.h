@@ -37,7 +37,7 @@ private:
     node* parse_program_statement_block();
 
     /** Procedures **/
-    node* parse_procedure();
+    node* parse_procedure(bool is_global = false);
     node* parse_procedure_declaration_block();
     node* parse_procedure_statement_block();
     node* parse_procedure_parameter_list(vector<int>& param_types);
@@ -82,7 +82,7 @@ private:
     bool process_block_comments(node* n);
     bool process_variable_declaration(node* n, bool is_global = false);
     bool process_variable_assignment(node* n);
-    bool process_procedure_declaration(node* n);
+    bool process_procedure_declaration(node* n, bool is_global = false);
     bool process_if_block(node* n);
     bool process_for_block(node* n);
     bool process_return_block(node* n);

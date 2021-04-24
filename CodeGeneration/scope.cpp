@@ -29,15 +29,16 @@ variable_inst *scope::get(std::string s) {
 
 }
 
-void scope::add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size) {
-    variable_inst* temp = new variable_inst(builder,module, type, clazz, size);
-    this->table.insert_or_assign(s, temp);
-    if (size > 1){
-        llvm::Value* tempSize = llvm::ConstantInt::get(llvm::Type::getInt32Ty(module->getContext()), llvm::APInt(32, size));
-        auto size = new variable_inst(builder,module, tempSize,llvm::Type::getInt32Ty(module->getContext()), variable_inst::VALUE, 1);
-        this->table.insert_or_assign(s + "_size", size);
-    }
-}
+//void scope::add(std::string s, llvm::Type* type, variable_inst::VARIABLE_CLASS clazz, int size) {
+//    std::cout << "THIS SHOULD NOT BE CALLED" << std::endl;
+//    variable_inst* temp = new variable_inst(builder,module, type, clazz, size);
+//    this->table.insert_or_assign(s, temp);
+//    if (size > 1){
+//        llvm::Value* tempSize = llvm::ConstantInt::get(llvm::Type::getInt32Ty(module->getContext()), llvm::APInt(32, size));
+//        auto size = new variable_inst(builder,module, tempSize,llvm::Type::getInt32Ty(module->getContext()), variable_inst::VALUE, 1);
+//        this->table.insert_or_assign(s + "_size", size);
+//    }
+//}
 
 void scope::add(std::string s, llvm::Value *value, llvm::Type *type, variable_inst::VARIABLE_CLASS clazz, bool is_global, int size) {
     variable_inst* vi = new variable_inst(builder,module, value, type, clazz, size);

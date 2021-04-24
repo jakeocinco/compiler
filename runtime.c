@@ -30,3 +30,21 @@ int stringCompare(char* l, char* r){
     }
     return 0;
 }
+
+int stringCompareNot(char* l, char* r) {
+    if (*l == '\00' && *r == '\00') {
+        return 0;
+    }
+    if (*l == '\00' || *r == '\00') {
+        return 1;
+    } else if (*l == *r) {
+        return stringCompareNot(++l, ++r);
+    }
+    return 1;
+}
+int castIntToBool(int i){
+    if (i == 0){
+        return 0;
+    }
+    return 1;
+}

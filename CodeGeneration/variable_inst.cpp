@@ -28,7 +28,6 @@ llvm::Value* variable_inst::get(llvm::Value* index) {
         llvm::Value *array_inst = val;
         llvm::Value *i32zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(m->getContext()), llvm::APInt(8, 0));
         llvm::Value *indices[2] = {i32zero, index};
-//        auto varInst = b->CreateGEP(array_inst, llvm::ArrayRef<llvm::Value *>(indices, 2));
         auto varInst = b->CreateInBoundsGEP(array_inst, llvm::ArrayRef<llvm::Value *>(indices, 2));
         return b->CreateLoad(varInst);
     } else if (clazz == VARIABLE_CLASS::ARRAY_INSTANCE && index == nullptr) {
@@ -42,7 +41,8 @@ void variable_inst::set(llvm::Value *val, llvm::Value *index, int new_val_size) 
     if (type != val->getType()){
         if (type == llvm::Type::getDoubleTy(m->getContext()) && val->getType() == llvm::Type::getInt32Ty(m->getContext()))
             val = b->CreateSIToFP(val, type);
-
+        if (type == llvm::Type::getInt1Ty(m->getContext()) && val->getType() == llvm::Type::getInt32Ty(m->getContext()))
+            val = b->CreateCall(m->getFunction("castIntToBool"), {val});
     }
 
     if (clazz == VARIABLE_CLASS::INSTANCE){
