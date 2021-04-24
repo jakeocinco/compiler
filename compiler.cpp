@@ -33,22 +33,22 @@ string compiler::get_file_text_as_string(const string& file_name) {
 }
 string compiler::get_file_name_root(const string& file_name) {
     string is = file_name;
-    string* ss = &is;
     int index = 0;
     while (true){
-        index = (*ss).find('/');
+        index = is.find('/');
         if (index > 0){
-            string temp = ((*ss).substr(index + 1));
-            ss = &temp;
+            string temp = is.substr(index + 1);
+            is = temp;
         } else {
             break;
         }
     }
-    index = (*ss).find('.');
-    return ((*ss).substr(0, index));
+    index = is.find('.');
+    return (is.substr(0, index));
 }
 
 void compiler::link_to_runtime(const string &file_name) {
+    cout << "Executable - " << file_name << endl;
     string temp = "clang output.o runtime.c -lm -o " + file_name;
     system(temp.c_str());
 }

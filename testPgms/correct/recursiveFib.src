@@ -19,8 +19,7 @@ procedure Fib : integer(variable val :integer)
 	if(val == 1) then
 		return 1;
 	end if;
-	//return val + Fib(Sub(val));
-	return val;
+	return val + Fib(Sub(val));
 end procedure;
 
 
