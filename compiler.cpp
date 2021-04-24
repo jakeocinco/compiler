@@ -16,10 +16,14 @@ using namespace std;
 
 compiler::compiler(const string& file_name) {
 
-    const string file_text = get_file_text_as_string(file_name);
-    new code_generation(file_text);
+    try{
+        const string file_text = get_file_text_as_string(file_name);
+        new code_generation(file_text);
 
-    link_to_runtime(get_file_name_root(file_name));
+        link_to_runtime(get_file_name_root(file_name));
+    } catch (runtime_error& re){
+        cout << "\nProgram was not compiled due to error" << endl;
+    }
 }
 
 string compiler::get_file_text_as_string(const string& file_name) {
@@ -48,7 +52,7 @@ string compiler::get_file_name_root(const string& file_name) {
 }
 
 void compiler::link_to_runtime(const string &file_name) {
-    cout << "Executable - " << file_name << endl;
+    cout << "Program compiled to executable: " << file_name << endl;
     string temp = "clang output.o runtime.c -lm -o " + file_name;
     system(temp.c_str());
 }

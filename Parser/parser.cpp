@@ -15,16 +15,23 @@ using namespace std::placeholders;
 
 parser::parser(string file_text) {
 
-    scan = new scanner(file_text + ' ');
-    initialize_symbol_table();
+    is_broken = false;
+    try{
+        scan = new scanner(file_text + ' ');
+        initialize_symbol_table();
 
-    current = scan->get_next_token();
-    next = scan->get_next_token();
+        current = scan->get_next_token();
+        next = scan->get_next_token();
 
-    head = parse_program();
+        head = parse_program();
 
-    if (false)
-        print_node_to_json(head);
+        if (false)
+            print_node_to_json(head);
+    } catch (runtime_error& re){
+        is_broken = true;
+        cout << re.what() << endl;
+    }
+
 }
 node* parser::get_head() {
     return head;
@@ -630,13 +637,21 @@ unsigned parser::type_to_literal(unsigned type){
 
 node*  parser::expecting_reserved_word(int expected_type, const string& expected_value) {
     parse_block_comments();
-    if (current.type == expected_type){
+    try {
+        if (current.type == expected_type){
+            node* n = new node(expected_value, expected_type);
+            consume_token();
+            return n;
+        }
+        throw_unexpected_token(expected_value, current.val.stringValue);
+        return nullptr;
+    } catch (runtime_error& re){
+        cout << re.what() << endl;
+        cout << "\t Adding '" + expected_value + "' and continuing parse." << endl;
         node* n = new node(expected_value, expected_type);
-        consume_token();
         return n;
     }
-    throw_unexpected_token(expected_value, current.val.stringValue);
-    return nullptr;
+
 }
 node*  parser::expecting_identifier() {
     parse_block_comments();
@@ -873,6 +888,10 @@ void parser::print_node_to_json(node *n, std::ofstream* file_id) {
         *(file_id) << "}\n";
         file_id->close();
     }
+}
+
+bool parser::get_is_broken() {
+    return is_broken;
 }
 
 

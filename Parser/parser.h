@@ -15,9 +15,13 @@
 class parser {
 public:
     parser(std::string file_text);
+
+    /** Getters **/
+    bool get_is_broken();
     node* get_head();
 private:
 
+    bool is_broken;
     scanner* scan;
     scanner::_token current{};
     scanner::_token next{};
@@ -101,6 +105,8 @@ private:
     void print_nodes(node* n, unsigned depth = 0);
     void print_node_leaves(node* n);
     void print_node_to_json(node* n, std::ofstream* file_id = nullptr);
+
+
 };
 
 

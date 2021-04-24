@@ -12,7 +12,7 @@ procedure Fib : integer(variable val :integer)
 			return val1 - 1;
 		end procedure;
 	begin
-
+begin
 	if(val == 0) then
 		return 0;
 	end if;

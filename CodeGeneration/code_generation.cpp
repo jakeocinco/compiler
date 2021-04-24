@@ -10,19 +10,22 @@
 
 code_generation::code_generation(std::string file_text) {
     auto p = parser(file_text);
-    this->tree = p.get_head();
+    if (!p.get_is_broken()){
+        this->tree = p.get_head();
 
-    IRBuilder<> temp = IRBuilder<>(context);
-    builder = &(temp);
+        IRBuilder<> temp = IRBuilder<>(context);
+        builder = &(temp);
 
-    if (this->tree->type == T_PROGRAM_ROOT)
-        codegen_program_root(this->tree);
-    else
-        std::cout << "Not program root" << endl;
+        if (this->tree->type == T_PROGRAM_ROOT)
+            codegen_program_root(this->tree);
+        else
+            std::cout << "Not program root" << endl;
 
-    print_module_ll(false);
-    write_module_to_file("output.o");
-
+        print_module_ll(false);
+        write_module_to_file("output.o");
+    } else {
+        throw runtime_error("Could not codegen");
+    }
 }
 
 /** Program **/
